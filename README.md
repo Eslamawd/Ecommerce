@@ -1,55 +1,197 @@
-# Next.js + Laravel API Integration Plan
+# 🛍️ Ecommerce — Next.js Frontend
 
-This frontend is wired to the Laravel API (`apiecomerce`) with a scalable baseline.
+> **الـ Frontend الكامل** لمشروع المتجر الإلكتروني مبني على Next.js 16 + TypeScript، متصل بـ Laravel API عبر Next.js Route Handlers كـ Secure Proxy.
 
-## Auth Mode (Phase 1)
+---
 
-- Current mode: Bearer token auth for fast local development.
-- Next phase: migrate to HttpOnly cookie flow through Next.js route handlers/proxy.
+## 🧱 Tech Stack
 
-## Implemented Foundation
+| Layer | Technology |
+|-------|-----------|
+| **Framework** | Next.js 16 (App Router) |
+| **Language** | TypeScript 5 |
+| **Styling** | Tailwind CSS 3 |
+| **Server State** | TanStack React Query 5 |
+| **Client State** | Zustand 5 |
+| **Animations** | Framer Motion 12 |
+| **Icons** | Lucide React |
+| **Themes** | next-themes (Dark/Light mode) |
+| **Toasts** | react-hot-toast |
+| **Date Utils** | Day.js |
 
-- `src/lib/api-client.ts`: typed API wrapper with unified error handling.
-- `src/lib/endpoints.ts`: central endpoint registry.
-- `src/lib/auth.ts`: token persistence helpers.
-- `src/types/*`: core domain types (`user`, `product`, `cart`, `order`).
-- `src/hooks/use-auth.ts`: login/register/me/logout hooks.
-- `src/hooks/use-products.ts`: products data hooks.
-- `middleware.ts`: role-aware route guard skeleton for `/admin/*` and `/vendor/*`.
-- `.env.example`: API base URL and future redirect/webhook-related values.
+---
 
-## Day-by-Day Execution
+## 🗂️ Project Structure
 
-### Day 1
+```
+app/
+├── api/                          # Next.js Route Handlers (Secure Proxy)
+│   ├── _lib/
+│   │   └── laravel.ts           # Helper لـ Laravel API calls
+│   ├── auth/
+│   │   ├── login/route.ts       # POST /api/auth/login
+│   │   ├── register/route.ts    # POST /api/auth/register
+│   │   ├── logout/route.ts      # POST /api/auth/logout
+│   │   └── me/route.ts          # GET  /api/auth/me
+│   └── proxy/[...path]/route.ts # Generic Proxy لكل الـ API calls الأخرى
+│
+├── (pages)/
+│   ├── page.tsx                 # Home Page
+│   ├── login/                   # صفحة تسجيل الدخول
+│   ├── register/                # صفحة التسجيل
+│   ├── products/                # قائمة ومنتج واحد
+│   ├── categories/              # الأقسام
+│   ├── cart/                    # السلة
+│   ├── checkout/                # الـ Checkout
+│   ├── orders/                  # طلباتي
+│   ├── wishlist/                # المفضلة
+│   ├── profile/                 # الملف الشخصي
+│   ├── notifications/           # الإشعارات
+│   ├── vendor/                  # لوحة الفيندور
+│   ├── admin/                   # لوحة الأدمن
+│   └── 403/                     # صفحة Unauthorized
+│
+├── layout.tsx                   # Root Layout
+├── globals.css                  # Global Styles
+└── providers.tsx                # React Query + Theme Providers
 
-- Auth flow pages: `/login`, `/register`, `/profile`.
-- Connect forms with `useLogin`, `useRegister`, and `useMe`.
-- Store role in cookie after login to activate route guard middleware.
-- Add global error handling for `401/403/422` + toasts.
+src/
+├── components/
+│   ├── site-nav.tsx             # Navigation Bar (responsive + role-aware)
+│   ├── theme-toggle.tsx         # Dark/Light Mode Toggle
+│   ├── theme-provider.tsx       # Theme Provider Wrapper
+│   └── pagination-controls.tsx  # Pagination Component
+├── hooks/
+│   ├── use-auth.ts              # useLogin, useRegister, useMe, useLogout
+│   └── use-products.ts          # Products data hooks
+├── lib/
+│   ├── api-client.ts            # Typed API wrapper + Error handling
+│   ├── endpoints.ts             # Central endpoint registry
+│   └── auth.ts                  # Token persistence helpers
+└── types/
+    └── *.ts                     # Core domain types (user, product, cart, order)
+```
 
-### Day 2
+---
 
-- Public products and categories listing pages.
-- Product details page with reviews listing.
+## 🔐 Authentication Architecture
 
-### Day 3
+الـ Authentication بيشتغل بطريقة **Secure Cookie-based** عبر Next.js Route Handlers:
 
-- Cart and wishlist full integration.
-- Checkout + orders flow.
+```
+Browser → Next.js Route Handler → Laravel API
+```
 
-### Day 4
+### كيف بيشتغل:
+1. **Login/Register:** الـ Frontend بيبعت للـ Next.js Route Handler
+2. الـ Route Handler بيتصل بـ Laravel API
+3. Laravel بيرجع `access_token`
+4. Next.js بيحفظ الـ token في **HttpOnly Cookie** (مش accessible من JS)
+5. أي request تاني بيمر عبر `/api/proxy/[...path]` اللي بيضيف الـ token تلقائياً
 
-- Payment initiate and status tracking pages.
-- Notifications center.
+### الـ Cookies المستخدمة:
+| Cookie | Value | HttpOnly |
+|--------|-------|---------|
+| `access_token` | Bearer token | ✅ Yes (secure) |
+| `auth_state` | `1` أو فاضي | ❌ No (للـ middleware) |
+| `role` | `admin\|vendor\|customer` | ❌ No (للـ route guards) |
 
-### Day 5
+---
 
-- Admin and vendor dashboards.
-- Hardening, smoke tests, and deployment configs.
+## 🧭 Navigation & Route Guards
 
-## First PR Structure (Suggested)
+### الـ Navigation بيكون dynamic حسب الـ Role:
+| User Type | Links المتاحة |
+|-----------|--------------|
+| Guest | Home, Shop |
+| Customer | + Cart, Orders, Profile |
+| Vendor | + Vendor Dashboard |
+| Admin | + Admin Dashboard |
 
-- `feat(integration): add api client and typed endpoint map`
-- `feat(auth): add token-based auth helpers and react-query hooks`
-- `feat(guards): add role-based middleware skeleton`
-- `docs: add integration execution checklist`
+### Route Guards (Middleware):
+- `/admin/*` → Admins فقط
+- `/vendor/*` → Vendors + Admins فقط
+- Redirect تلقائي لو مش authorized
+
+---
+
+## 📄 Pages Overview
+
+| Page | Path | Description |
+|------|------|-------------|
+| Home | `/` | الصفحة الرئيسية |
+| Login | `/login` | تسجيل الدخول |
+| Register | `/register` | إنشاء حساب |
+| Products | `/products` | كل المنتجات |
+| Categories | `/categories` | الأقسام |
+| Cart | `/cart` | سلة التسوق |
+| Checkout | `/checkout` | إتمام الشراء |
+| Orders | `/orders` | سجل الطلبات |
+| Wishlist | `/wishlist` | المفضلة |
+| Profile | `/profile` | الملف الشخصي |
+| Notifications | `/notifications` | الإشعارات |
+| Vendor | `/vendor` | لوحة تحكم البائع |
+| Admin | `/admin` | لوحة تحكم الأدمن |
+| 403 | `/403` | Unauthorized |
+
+---
+
+## 🚀 Setup & Installation
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Setup environment
+cp .env.example .env.local
+
+# 3. Edit .env.local
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
+
+# 4. Run development server
+npm run dev
+```
+
+### متطلبات:
+- Node.js 18+
+- الـ Laravel Backend شغال على `localhost:8000`
+
+---
+
+## 📦 Available Scripts
+
+```bash
+npm run dev      # Development server
+npm run build    # Production build
+npm run start    # Production server
+npm run lint     # ESLint
+```
+
+---
+
+## 🎨 UI Features
+
+- ✅ **Dark/Light Mode** — System preference + manual toggle
+- ✅ **Responsive Design** — Mobile-first مع Hamburger menu
+- ✅ **Animated Transitions** — Framer Motion للـ mobile menu
+- ✅ **Loading States** — React Query built-in
+- ✅ **Toast Notifications** — react-hot-toast
+- ✅ **Pagination** — Reusable PaginationControls component
+
+---
+
+## 🗺️ Development Roadmap
+
+| Day | Tasks |
+|-----|-------|
+| **Day 1** ✅ | Auth pages (login, register, profile) + Route Guards |
+| **Day 2** | Products & Categories listing + Product details |
+| **Day 3** | Cart, Wishlist, Checkout, Orders |
+| **Day 4** | Payment, Notifications center |
+| **Day 5** | Admin & Vendor dashboards + Deployment |
+
+---
+
+## 🔗 Related Project
+
+- **Backend API:** [`Eslamawd/apiecomerce`](https://github.com/Eslamawd/apiecomerce) — Laravel 12 REST API
