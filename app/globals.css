@@ -1,3 +1,36 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --bg: #f6f8ff;
+  --text: #1b2233;
+  --card: #ffffff;
+  --accent: #0ea5a4;
+  --muted: #62708a;
+}
+
+.dark {
+  --bg: #0f172a;
+  --text: #ecf1ff;
+  --card: #121c33;
+  --accent: #22d3ee;
+  --muted: #9badcb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(circle at 10% 10%, #34d39933, transparent 30%),
+    radial-gradient(circle at 90% 0%, #38bdf833, transparent 25%), var(--bg);
+  color: var(--text);
+}
