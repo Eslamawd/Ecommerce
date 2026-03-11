@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const backendResponse = await fetch(resolveLaravelUrl("/auth/me"), {
+  const backendResponse = await fetch(resolveLaravelUrl("/me"), {
     method: "GET",
     headers: {
       Accept: "application/json",

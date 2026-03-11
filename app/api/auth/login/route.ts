@@ -8,7 +8,7 @@ import {
 export async function POST(request: NextRequest) {
   const body = await readRequestBody(request);
 
-  const backendResponse = await fetch(resolveLaravelUrl("/auth/login"), {
+  const backendResponse = await fetch(resolveLaravelUrl("/login"), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body,
