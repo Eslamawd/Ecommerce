@@ -17,7 +17,7 @@ const SITE_BASE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 const PRODUCT_REVALIDATE_SECONDS = 120;
 
-export const revalidate = PRODUCT_REVALIDATE_SECONDS;
+export const revalidate = 120;
 
 async function fetchProductBySlug(slug: string): Promise<Product | null> {
   const response = await fetch(

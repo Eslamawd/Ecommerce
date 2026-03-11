@@ -24,7 +24,7 @@ const SITE_BASE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 const SITEMAP_REVALIDATE_SECONDS = 300;
 
-export const revalidate = SITEMAP_REVALIDATE_SECONDS;
+export const revalidate = 300;
 
 function parseArrayPayload<T>(payload: unknown): T[] {
   if (Array.isArray(payload)) {
