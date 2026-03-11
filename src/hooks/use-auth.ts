@@ -19,6 +19,27 @@ type RegisterInput = {
   phone?: string;
 };
 
+type RegisterResult = {
+  user?: User;
+  requires_verification?: boolean;
+  email?: string;
+};
+
+type ResendVerificationInput = {
+  email: string;
+};
+
+type ForgotPasswordInput = {
+  email: string;
+};
+
+type ResetPasswordInput = {
+  email: string;
+  token: string;
+  password: string;
+  password_confirmation: string;
+};
+
 export function useMe() {
   return useQuery({
     queryKey: ["auth", "me"],
@@ -49,14 +70,46 @@ export function useRegister() {
 
   return useMutation({
     mutationFn: (body: RegisterInput) =>
-      apiRequest<{ user: User }>(ENDPOINTS.auth.register, {
+      apiRequest<RegisterResult>(ENDPOINTS.auth.register, {
         method: "POST",
         body,
       }),
     onSuccess: (payload) => {
-      saveAuthSession(payload.user);
-      queryClient.invalidateQueries({ queryKey: ["auth"] });
+      if (payload.user) {
+        saveAuthSession(payload.user);
+        queryClient.invalidateQueries({ queryKey: ["auth"] });
+      }
     },
+  });
+}
+
+export function useResendVerification() {
+  return useMutation({
+    mutationFn: (body: ResendVerificationInput) =>
+      apiRequest<void>(ENDPOINTS.auth.resendVerification, {
+        method: "POST",
+        body,
+      }),
+  });
+}
+
+export function useForgotPassword() {
+  return useMutation({
+    mutationFn: (body: ForgotPasswordInput) =>
+      apiRequest<void>(ENDPOINTS.auth.forgotPassword, {
+        method: "POST",
+        body,
+      }),
+  });
+}
+
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: (body: ResetPasswordInput) =>
+      apiRequest<void>(ENDPOINTS.auth.resetPassword, {
+        method: "POST",
+        body,
+      }),
   });
 }
 

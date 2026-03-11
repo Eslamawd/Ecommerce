@@ -2,12 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
-import { useCreateOrder } from "../../src/hooks/use-orders";
+import toast from "react-hot-toast";
+import { useCreateOrder, useValidateCoupon } from "../../src/hooks/use-orders";
+import { useLanguage } from "../../src/components/language-provider";
 import { getApiErrorMessages } from "../../src/lib/api-client";
 
 export default function CheckoutPage() {
   const router = useRouter();
   const createOrderMutation = useCreateOrder();
+  const validateCouponMutation = useValidateCoupon();
+  const { t, language } = useLanguage();
 
   const [form, setForm] = useState({
     shipping_name: "",
@@ -15,10 +19,14 @@ export default function CheckoutPage() {
     shipping_address: "",
     shipping_city: "",
     shipping_email: "",
-    payment_method: "cash_on_delivery" as "cash_on_delivery" | "online",
+    payment_method: "cash_on_delivery" as const,
     coupon_code: "",
     notes: "",
+    shipping_latitude: "",
+    shipping_longitude: "",
   });
+
+  const [isLocating, setIsLocating] = useState(false);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -29,6 +37,12 @@ export default function CheckoutPage() {
         coupon_code: form.coupon_code || undefined,
         shipping_email: form.shipping_email || undefined,
         notes: form.notes || undefined,
+        shipping_latitude: form.shipping_latitude
+          ? Number(form.shipping_latitude)
+          : undefined,
+        shipping_longitude: form.shipping_longitude
+          ? Number(form.shipping_longitude)
+          : undefined,
       });
 
       router.push(`/orders?created=${order.order_number}`);
@@ -37,16 +51,73 @@ export default function CheckoutPage() {
     }
   };
 
+  const validateCoupon = async () => {
+    if (!form.coupon_code.trim()) {
+      toast.error(t("checkout_coupon_optional"));
+      return;
+    }
+
+    try {
+      const result = await validateCouponMutation.mutateAsync({
+        code: form.coupon_code.trim(),
+      });
+      toast.success(`${t("checkout_validate_coupon")}: ${result.discount}`);
+    } catch (error) {
+      toast.error(getApiErrorMessages(error).join(" | "));
+    }
+  };
+
+  const detectLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error(
+        language === "en"
+          ? "Geolocation is not supported."
+          : "المتصفح لا يدعم تحديد الموقع.",
+      );
+      return;
+    }
+
+    setIsLocating(true);
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setForm((prev) => ({
+          ...prev,
+          shipping_latitude: String(position.coords.latitude),
+          shipping_longitude: String(position.coords.longitude),
+        }));
+
+        setIsLocating(false);
+        toast.success(
+          language === "en" ? "Location detected." : "تم تحديد الموقع بنجاح.",
+        );
+      },
+      () => {
+        setIsLocating(false);
+        toast.error(
+          language === "en"
+            ? "Failed to get location."
+            : "فشل تحديد الموقع. تأكد من الصلاحيات.",
+        );
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      },
+    );
+  };
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-4xl p-6 md:p-10">
-      <h1 className="mb-6 text-3xl font-bold">Checkout</h1>
+      <h1 className="mb-6 text-3xl font-bold">{t("checkout_title")}</h1>
 
       <form
         onSubmit={onSubmit}
         className="space-y-4 rounded-2xl bg-card p-5 shadow-soft md:p-7"
       >
         <Field
-          label="Shipping name"
+          label={t("checkout_shipping_name")}
           value={form.shipping_name}
           onChange={(value) =>
             setForm((prev) => ({ ...prev, shipping_name: value }))
@@ -54,7 +125,7 @@ export default function CheckoutPage() {
           required
         />
         <Field
-          label="Shipping phone"
+          label={t("checkout_shipping_phone")}
           value={form.shipping_phone}
           onChange={(value) =>
             setForm((prev) => ({ ...prev, shipping_phone: value }))
@@ -62,7 +133,7 @@ export default function CheckoutPage() {
           required
         />
         <Field
-          label="Shipping address"
+          label={t("checkout_shipping_address")}
           value={form.shipping_address}
           onChange={(value) =>
             setForm((prev) => ({ ...prev, shipping_address: value }))
@@ -70,7 +141,7 @@ export default function CheckoutPage() {
           required
         />
         <Field
-          label="Shipping city"
+          label={t("checkout_shipping_city")}
           value={form.shipping_city}
           onChange={(value) =>
             setForm((prev) => ({ ...prev, shipping_city: value }))
@@ -78,59 +149,77 @@ export default function CheckoutPage() {
           required
         />
         <Field
-          label="Shipping email (optional)"
+          label={t("checkout_shipping_email_optional")}
           value={form.shipping_email}
           onChange={(value) =>
             setForm((prev) => ({ ...prev, shipping_email: value }))
           }
           type="email"
         />
+
+        <div className="space-y-2 rounded-xl border border-slate-300/60 p-3 dark:border-slate-700">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-muted">
+              {language === "en"
+                ? "Delivery location (optional but recommended)"
+                : "موقع التسليم (اختياري لكن مفضل)"}
+            </p>
+            <button
+              type="button"
+              onClick={detectLocation}
+              disabled={isLocating}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs dark:border-slate-700"
+            >
+              {isLocating
+                ? language === "en"
+                  ? "Detecting..."
+                  : "جاري التحديد..."
+                : language === "en"
+                  ? "Use my location"
+                  : "استخدم موقعي"}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <Field
+              label={language === "en" ? "Latitude" : "خط العرض"}
+              value={form.shipping_latitude}
+              onChange={(value) =>
+                setForm((prev) => ({ ...prev, shipping_latitude: value }))
+              }
+            />
+            <Field
+              label={language === "en" ? "Longitude" : "خط الطول"}
+              value={form.shipping_longitude}
+              onChange={(value) =>
+                setForm((prev) => ({ ...prev, shipping_longitude: value }))
+              }
+            />
+          </div>
+        </div>
+
         <Field
-          label="Coupon code (optional)"
+          label={t("checkout_coupon_optional")}
           value={form.coupon_code}
           onChange={(value) =>
             setForm((prev) => ({ ...prev, coupon_code: value }))
           }
         />
+        <button
+          type="button"
+          onClick={validateCoupon}
+          className="rounded-xl border border-slate-300 px-4 py-2 text-sm dark:border-slate-700"
+        >
+          {t("checkout_validate_coupon")}
+        </button>
 
-        <div>
-          <p className="mb-2 text-sm text-muted">Payment method</p>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              className={`rounded-xl px-4 py-2 text-sm ${
-                form.payment_method === "cash_on_delivery"
-                  ? "bg-accent font-semibold text-slate-950"
-                  : "border border-slate-300 dark:border-slate-700"
-              }`}
-              onClick={() =>
-                setForm((prev) => ({
-                  ...prev,
-                  payment_method: "cash_on_delivery",
-                }))
-              }
-            >
-              Cash on delivery
-            </button>
-            <button
-              type="button"
-              className={`rounded-xl px-4 py-2 text-sm ${
-                form.payment_method === "online"
-                  ? "bg-accent font-semibold text-slate-950"
-                  : "border border-slate-300 dark:border-slate-700"
-              }`}
-              onClick={() =>
-                setForm((prev) => ({ ...prev, payment_method: "online" }))
-              }
-            >
-              Online
-            </button>
-          </div>
+        <div className="rounded-xl border border-emerald-300/70 bg-emerald-100/60 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+          {t("checkout_payment_cod_only")}
         </div>
 
         <div>
           <label className="mb-1 block text-sm text-muted">
-            Notes (optional)
+            {t("checkout_notes_optional")}
           </label>
           <textarea
             value={form.notes}
@@ -157,7 +246,9 @@ export default function CheckoutPage() {
           disabled={createOrderMutation.isPending}
           className="w-full rounded-xl bg-accent px-4 py-2 font-medium text-slate-950 transition hover:opacity-90 disabled:opacity-60"
         >
-          {createOrderMutation.isPending ? "Placing order..." : "Place order"}
+          {createOrderMutation.isPending
+            ? t("checkout_placing")
+            : t("checkout_place_order")}
         </button>
       </form>
     </main>

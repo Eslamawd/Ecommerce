@@ -4,12 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { PaginationControls } from "../../src/components/pagination-controls";
-import {
-  useCancelOrder,
-  useInitiatePayment,
-  useOrdersPage,
-  usePaymentStatus,
-} from "../../src/hooks/use-orders";
+import { useCancelOrder, useOrdersPage } from "../../src/hooks/use-orders";
+import { useLanguage } from "../../src/components/language-provider";
 import { getApiErrorMessages } from "../../src/lib/api-client";
 
 export default function OrdersPage() {
@@ -24,35 +20,15 @@ export default function OrdersPage() {
 
   const ordersQuery = useOrdersPage(page);
   const cancelMutation = useCancelOrder();
-  const paymentMutation = useInitiatePayment();
+  const { t } = useLanguage();
 
   const orders = ordersQuery.data?.data ?? [];
   const paginationMeta = ordersQuery.data?.meta;
-  const latestOrderNumber = orders[0]?.order_number;
-  const paymentStatusQuery = usePaymentStatus(latestOrderNumber);
 
   const handleCancelOrder = async (orderNumber: string) => {
     try {
       await cancelMutation.mutateAsync(orderNumber);
-      toast.success("Order cancelled successfully");
-    } catch (error) {
-      toast.error(getApiErrorMessages(error).join(" | "));
-    }
-  };
-
-  const handlePayment = async (
-    orderNumber: string,
-    gateway: "stripe" | "paypal" | "cod",
-  ) => {
-    try {
-      const result = await paymentMutation.mutateAsync({
-        order_number: orderNumber,
-        gateway,
-      });
-      if (result.payment_url) {
-        window.open(result.payment_url, "_blank", "noopener,noreferrer");
-      }
-      toast.success("Payment request sent");
+      toast.success(t("orders_cancel_success"));
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
@@ -61,23 +37,23 @@ export default function OrdersPage() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl p-6 md:p-10">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">My Orders</h1>
+        <h1 className="text-3xl font-bold">{t("orders_title")}</h1>
         <Link
           href="/checkout"
           className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-slate-950"
         >
-          New order
+          {t("orders_new_order")}
         </Link>
       </div>
 
       {created ? (
         <p className="mb-4 rounded-xl bg-emerald-100 px-4 py-2 text-sm text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-          Order created successfully: {created}
+          {t("orders_created_success")}: {created}
         </p>
       ) : null}
 
       {ordersQuery.isLoading ? (
-        <p className="text-sm text-muted">Loading orders...</p>
+        <p className="text-sm text-muted">{t("orders_loading")}</p>
       ) : null}
 
       {ordersQuery.isError ? (
@@ -106,6 +82,24 @@ export default function OrdersPage() {
               </p>
             </div>
 
+            <div className="mt-4 grid grid-cols-1 gap-2 text-sm text-muted md:grid-cols-2">
+              <p>
+                {t("orders_shipping_name")}: {order.shipping_name || "-"}
+              </p>
+              <p>
+                {t("orders_shipping_phone")}: {order.shipping_phone || "-"}
+              </p>
+              <p>
+                {t("orders_shipping_city")}: {order.shipping_city || "-"}
+              </p>
+              <p>
+                {t("orders_shipping_email")}: {order.shipping_email || "-"}
+              </p>
+              <p className="md:col-span-2">
+                {t("orders_shipping_address")}: {order.shipping_address || "-"}
+              </p>
+            </div>
+
             <div className="mt-4 flex flex-wrap gap-2">
               {order.status === "pending" ? (
                 <button
@@ -113,37 +107,15 @@ export default function OrdersPage() {
                   onClick={() => handleCancelOrder(order.order_number)}
                   className="rounded-lg border border-rose-300 px-3 py-1 text-sm text-rose-700 dark:border-rose-800 dark:text-rose-300"
                 >
-                  Cancel order
+                  {t("orders_cancel")}
                 </button>
               ) : null}
-
-              <button
-                type="button"
-                onClick={() => handlePayment(order.order_number, "stripe")}
-                className="rounded-lg border border-slate-300 px-3 py-1 text-sm dark:border-slate-700"
-              >
-                Pay (Stripe)
-              </button>
-              <button
-                type="button"
-                onClick={() => handlePayment(order.order_number, "paypal")}
-                className="rounded-lg border border-slate-300 px-3 py-1 text-sm dark:border-slate-700"
-              >
-                Pay (PayPal)
-              </button>
-              <button
-                type="button"
-                onClick={() => handlePayment(order.order_number, "cod")}
-                className="rounded-lg border border-slate-300 px-3 py-1 text-sm dark:border-slate-700"
-              >
-                Set COD
-              </button>
             </div>
           </article>
         ))}
 
         {!ordersQuery.isLoading && orders.length === 0 ? (
-          <p className="text-sm text-muted">No orders yet.</p>
+          <p className="text-sm text-muted">{t("orders_no_orders")}</p>
         ) : null}
 
         {paginationMeta ? (
@@ -156,28 +128,9 @@ export default function OrdersPage() {
         ) : null}
       </div>
 
-      {paymentMutation.isError ? (
-        <div className="mt-4 space-y-1 rounded-xl bg-rose-100 px-4 py-2 text-sm text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-          {getApiErrorMessages(paymentMutation.error).map((message, i) => (
-            <p key={`${message}-${i}`}>{message}</p>
-          ))}
-        </div>
-      ) : null}
-
-      {paymentStatusQuery.data ? (
-        <section className="mt-6 rounded-2xl bg-card p-5 shadow-soft md:p-7">
-          <h3 className="text-lg font-semibold">Latest payment status</h3>
-          <p className="mt-2 text-sm text-muted">
-            Order: {paymentStatusQuery.data.order_number}
-          </p>
-          <p className="text-sm text-muted">
-            Method: {paymentStatusQuery.data.payment_method || "-"}
-          </p>
-          <p className="text-sm text-muted">
-            Status: {paymentStatusQuery.data.payment_status}
-          </p>
-        </section>
-      ) : null}
+      <section className="mt-6 rounded-2xl border border-emerald-300/60 bg-emerald-100/60 p-4 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+        {t("orders_cod_only_note")}
+      </section>
     </main>
   );
 }

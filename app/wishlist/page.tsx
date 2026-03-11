@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useRemoveWishlistItem, useWishlist } from "../../src/hooks/use-cart";
+import { useLanguage } from "../../src/components/language-provider";
 import { getApiErrorMessages } from "../../src/lib/api-client";
 
 export default function WishlistPage() {
   const wishlistQuery = useWishlist();
   const removeMutation = useRemoveWishlistItem();
+  const { t } = useLanguage();
 
   const products = wishlistQuery.data ?? [];
 
@@ -19,14 +21,14 @@ export default function WishlistPage() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl p-6 md:p-10">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Wishlist</h1>
+        <h1 className="text-3xl font-bold">{t("wishlist_title")}</h1>
         <Link href="/" className="text-sm text-accent hover:underline">
-          Explore products
+          {t("wishlist_explore_products")}
         </Link>
       </div>
 
       {wishlistQuery.isLoading ? (
-        <p className="text-sm text-muted">Loading wishlist...</p>
+        <p className="text-sm text-muted">{t("wishlist_loading")}</p>
       ) : null}
 
       {wishlistQuery.isError ? (
@@ -39,7 +41,7 @@ export default function WishlistPage() {
               href="/login?next=/wishlist"
               className="font-medium text-accent hover:underline"
             >
-              Login to access your wishlist
+              {t("wishlist_login_to_access")}
             </Link>
           </p>
         </div>
@@ -48,7 +50,7 @@ export default function WishlistPage() {
       {!wishlistQuery.isError ? (
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {products.length === 0 ? (
-            <p className="text-sm text-muted">No products in wishlist yet.</p>
+            <p className="text-sm text-muted">{t("wishlist_empty")}</p>
           ) : null}
 
           {products.map((product) => (
@@ -58,7 +60,7 @@ export default function WishlistPage() {
             >
               <h2 className="line-clamp-1 font-semibold">{product.name}</h2>
               <p className="mt-2 line-clamp-2 text-sm text-muted">
-                {product.description || "No description."}
+                {product.description || t("wishlist_no_description")}
               </p>
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-sm font-medium text-accent">
@@ -70,7 +72,7 @@ export default function WishlistPage() {
                   disabled={removeMutation.isPending}
                   className="rounded-lg bg-rose-100 px-3 py-1 text-sm text-rose-700 hover:opacity-90 disabled:opacity-60 dark:bg-rose-900/40 dark:text-rose-300"
                 >
-                  Remove
+                  {t("wishlist_remove")}
                 </button>
               </div>
               <div className="mt-3">
@@ -78,7 +80,7 @@ export default function WishlistPage() {
                   href={`/products/${product.slug}`}
                   className="text-sm text-accent hover:underline"
                 >
-                  View details
+                  {t("wishlist_view_details")}
                 </Link>
               </div>
             </article>

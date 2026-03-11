@@ -10,6 +10,7 @@ import {
   useNotificationsPage,
   useUnreadNotifications,
 } from "../../src/hooks/use-notifications";
+import { useLanguage } from "../../src/components/language-provider";
 import { getApiErrorMessages } from "../../src/lib/api-client";
 
 export default function NotificationsPage() {
@@ -19,6 +20,7 @@ export default function NotificationsPage() {
   const markReadMutation = useMarkNotificationRead();
   const markAllMutation = useMarkAllNotificationsRead();
   const deleteMutation = useDeleteNotification();
+  const { t } = useLanguage();
 
   const notifications = notificationsQuery.data?.data ?? [];
   const paginationMeta = notificationsQuery.data?.meta;
@@ -27,7 +29,7 @@ export default function NotificationsPage() {
   const markAsRead = async (id: string) => {
     try {
       await markReadMutation.mutateAsync(id);
-      toast.success("Notification marked as read");
+      toast.success(t("notifications_marked_read"));
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
@@ -36,7 +38,7 @@ export default function NotificationsPage() {
   const markAllAsRead = async () => {
     try {
       await markAllMutation.mutateAsync();
-      toast.success("All notifications marked as read");
+      toast.success(t("notifications_all_marked_read"));
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
@@ -45,7 +47,7 @@ export default function NotificationsPage() {
   const removeNotification = async (id: string) => {
     try {
       await deleteMutation.mutateAsync(id);
-      toast.success("Notification deleted");
+      toast.success(t("notifications_deleted"));
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
@@ -55,20 +57,22 @@ export default function NotificationsPage() {
     <main className="mx-auto min-h-screen w-full max-w-6xl p-6 md:p-10">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Notifications</h1>
-          <p className="text-sm text-muted">Unread: {unreadCount}</p>
+          <h1 className="text-3xl font-bold">{t("notifications_title")}</h1>
+          <p className="text-sm text-muted">
+            {t("notifications_unread")}: {unreadCount}
+          </p>
         </div>
         <button
           type="button"
           onClick={markAllAsRead}
           className="rounded-xl border border-slate-300 px-4 py-2 text-sm dark:border-slate-700"
         >
-          Mark all as read
+          {t("notifications_mark_all_read")}
         </button>
       </div>
 
       {notificationsQuery.isLoading ? (
-        <p className="text-sm text-muted">Loading notifications...</p>
+        <p className="text-sm text-muted">{t("notifications_loading")}</p>
       ) : null}
 
       {notificationsQuery.isError ? (
@@ -106,7 +110,7 @@ export default function NotificationsPage() {
                     onClick={() => markAsRead(notification.id)}
                     className="rounded-lg border border-slate-300 px-3 py-1 text-sm dark:border-slate-700"
                   >
-                    Mark read
+                    {t("notifications_mark_read")}
                   </button>
                 ) : null}
                 <button
@@ -114,7 +118,7 @@ export default function NotificationsPage() {
                   onClick={() => removeNotification(notification.id)}
                   className="rounded-lg bg-rose-100 px-3 py-1 text-sm text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
                 >
-                  Delete
+                  {t("notifications_delete")}
                 </button>
               </div>
             </div>
@@ -122,7 +126,7 @@ export default function NotificationsPage() {
         ))}
 
         {!notificationsQuery.isLoading && notifications.length === 0 ? (
-          <p className="text-sm text-muted">No notifications yet.</p>
+          <p className="text-sm text-muted">{t("notifications_empty")}</p>
         ) : null}
 
         {paginationMeta ? (

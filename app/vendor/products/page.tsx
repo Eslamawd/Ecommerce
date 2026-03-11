@@ -17,12 +17,30 @@ import {
   useUploadVendorVideos,
   useVendorProducts,
 } from "../../../src/hooks/use-vendor";
+import { useLanguage } from "../../../src/components/language-provider";
 import { getApiErrorMessages } from "../../../src/lib/api-client";
+import {
+  createSpecificationRow,
+  createVariantRow,
+  fromSpecificationsObject,
+  fromVariants,
+  toSpecificationsObject,
+  toVariantsPayload,
+  type SpecificationRow,
+  type VariantRow,
+} from "../../../src/lib/product-form-utils";
 import type { Product } from "../../../src/types/product";
 
 type ProductFormState = {
   name: string;
   name_en: string;
+  product_type:
+    | "general"
+    | "clothing"
+    | "automotive"
+    | "food"
+    | "electronics"
+    | "other";
   description: string;
   description_en: string;
   price: string;
@@ -44,6 +62,7 @@ type TempUploadPreview = {
 const INITIAL_FORM: ProductFormState = {
   name: "",
   name_en: "",
+  product_type: "general",
   description: "",
   description_en: "",
   price: "",
@@ -56,17 +75,27 @@ const INITIAL_FORM: ProductFormState = {
   is_featured: false,
 };
 
-function toPayload(form: ProductFormState): VendorProductPayload {
+function toPayload(
+  form: ProductFormState,
+  specificationsRows: SpecificationRow[],
+  variantRows: VariantRow[],
+): VendorProductPayload {
+  const specifications = toSpecificationsObject(specificationsRows);
+  const variants = toVariantsPayload(variantRows);
+
   return {
     name: form.name,
     name_en: form.name_en,
+    product_type: form.product_type,
     description: form.description,
     description_en: form.description_en,
+    specifications,
     price: Number(form.price),
     old_price: form.old_price ? Number(form.old_price) : null,
     cost_price: form.cost_price ? Number(form.cost_price) : null,
     sku: form.sku || null,
     quantity: Number(form.quantity),
+    variants,
     category_id: Number(form.category_id),
     is_active: form.is_active,
     is_featured: form.is_featured,
@@ -77,6 +106,14 @@ function toEditForm(product: Product): ProductFormState {
   return {
     name: product.name || "",
     name_en: product.name_en || "",
+    product_type:
+      product.product_type === "clothing" ||
+      product.product_type === "automotive" ||
+      product.product_type === "food" ||
+      product.product_type === "electronics" ||
+      product.product_type === "other"
+        ? product.product_type
+        : "general",
     description: product.description || "",
     description_en: product.description_en || "",
     price: String(product.price ?? ""),
@@ -95,10 +132,22 @@ export default function VendorProductsPage() {
   const [createForm, setCreateForm] = useState<ProductFormState>(INITIAL_FORM);
   const [createImages, setCreateImages] = useState<File[]>([]);
   const [createVideos, setCreateVideos] = useState<File[]>([]);
+  const [createSpecifications, setCreateSpecifications] = useState<
+    SpecificationRow[]
+  >([createSpecificationRow()]);
+  const [createVariants, setCreateVariants] = useState<VariantRow[]>([
+    createVariantRow(),
+  ]);
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<ProductFormState>(INITIAL_FORM);
   const [editImages, setEditImages] = useState<File[]>([]);
   const [editVideos, setEditVideos] = useState<File[]>([]);
+  const [editSpecifications, setEditSpecifications] = useState<
+    SpecificationRow[]
+  >([createSpecificationRow()]);
+  const [editVariants, setEditVariants] = useState<VariantRow[]>([
+    createVariantRow(),
+  ]);
   const [busyProductIds, setBusyProductIds] = useState<number[]>([]);
   const [tempImageUploads, setTempImageUploads] = useState<
     Record<number, TempUploadPreview[]>
@@ -120,6 +169,7 @@ export default function VendorProductsPage() {
   const setPrimaryImageMutation = useSetVendorPrimaryImage();
   const uploadVideosMutation = useUploadVendorVideos();
   const deleteVideoMutation = useDeleteVendorVideo();
+  const { t } = useLanguage();
 
   const products = productsQuery.data?.data ?? [];
   const paginationMeta = productsQuery.data?.meta;
@@ -234,20 +284,22 @@ export default function VendorProductsPage() {
     event.preventDefault();
 
     if (!createForm.category_id) {
-      toast.error("Please select category");
+      toast.error(t("vendor_products_select_category"));
       return;
     }
 
     try {
       await createMutation.mutateAsync({
-        payload: toPayload(createForm),
+        payload: toPayload(createForm, createSpecifications, createVariants),
         images: createImages,
         videos: createVideos,
       });
       setCreateForm(INITIAL_FORM);
       setCreateImages([]);
       setCreateVideos([]);
-      toast.success("Product created");
+      setCreateSpecifications([createSpecificationRow()]);
+      setCreateVariants([createVariantRow()]);
+      toast.success(t("vendor_products_created"));
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
@@ -258,6 +310,8 @@ export default function VendorProductsPage() {
     setEditForm(toEditForm(product));
     setEditImages([]);
     setEditVideos([]);
+    setEditSpecifications(fromSpecificationsObject(product.specifications));
+    setEditVariants(fromVariants(product.variants));
   };
 
   const handleUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -270,22 +324,24 @@ export default function VendorProductsPage() {
     try {
       await updateMutation.mutateAsync({
         productId: editingProductId,
-        payload: toPayload(editForm),
+        payload: toPayload(editForm, editSpecifications, editVariants),
         images: editImages,
         videos: editVideos,
       });
-      toast.success("Product updated");
+      toast.success(t("vendor_products_updated"));
       setEditingProductId(null);
       setEditForm(INITIAL_FORM);
       setEditImages([]);
       setEditVideos([]);
+      setEditSpecifications([createSpecificationRow()]);
+      setEditVariants([createVariantRow()]);
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
   };
 
   const handleDelete = async (productId: number) => {
-    if (!window.confirm("Delete this product?")) {
+    if (!window.confirm(t("vendor_products_delete_confirm"))) {
       return;
     }
 
@@ -297,7 +353,7 @@ export default function VendorProductsPage() {
           setEditingProductId(null);
         }
       },
-      "Product deleted",
+      t("vendor_products_deleted"),
     );
   };
 
@@ -314,7 +370,7 @@ export default function VendorProductsPage() {
         uploadImagesMutation
           .mutateAsync({ productId, files })
           .then(() => undefined),
-      "Images uploaded",
+      t("vendor_products_images_uploaded"),
     );
 
     setImagePreviewsForProduct(productId, []);
@@ -333,7 +389,7 @@ export default function VendorProductsPage() {
         uploadVideosMutation
           .mutateAsync({ productId, files })
           .then(() => undefined),
-      "Videos uploaded",
+      t("vendor_products_videos_uploaded"),
     );
 
     setVideoPreviewsForProduct(productId, []);
@@ -342,17 +398,19 @@ export default function VendorProductsPage() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl p-6 md:p-10">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Vendor Products</h1>
+        <h1 className="text-3xl font-bold">{t("vendor_products_title")}</h1>
         <Link
           href="/vendor"
           className="rounded-xl border border-slate-300 px-4 py-2 text-sm dark:border-slate-700"
         >
-          Back to dashboard
+          {t("vendor_products_back_dashboard")}
         </Link>
       </div>
 
       <section className="mb-8 rounded-2xl bg-card p-5 shadow-soft md:p-7">
-        <h2 className="mb-4 text-xl font-semibold">Create Product</h2>
+        <h2 className="mb-4 text-xl font-semibold">
+          {t("vendor_products_create_title")}
+        </h2>
 
         <form
           onSubmit={handleCreate}
@@ -361,7 +419,7 @@ export default function VendorProductsPage() {
           <fieldset disabled={isCreateBusy} className="contents">
             <input
               className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-              placeholder="Name"
+              placeholder={t("field_name")}
               value={createForm.name}
               onChange={(e) =>
                 setCreateForm((prev) => ({ ...prev, name: e.target.value }))
@@ -370,7 +428,7 @@ export default function VendorProductsPage() {
             />
             <input
               className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-              placeholder="Name EN"
+              placeholder={t("field_name_en")}
               value={createForm.name_en}
               onChange={(e) =>
                 setCreateForm((prev) => ({ ...prev, name_en: e.target.value }))
@@ -379,7 +437,7 @@ export default function VendorProductsPage() {
             />
             <textarea
               className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-              placeholder="Description"
+              placeholder={t("field_description")}
               value={createForm.description}
               onChange={(e) =>
                 setCreateForm((prev) => ({
@@ -391,7 +449,7 @@ export default function VendorProductsPage() {
             />
             <textarea
               className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-              placeholder="Description EN"
+              placeholder={t("field_description_en")}
               value={createForm.description_en}
               onChange={(e) =>
                 setCreateForm((prev) => ({
@@ -406,7 +464,7 @@ export default function VendorProductsPage() {
               min="0"
               step="0.01"
               className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-              placeholder="Price"
+              placeholder={t("field_price")}
               value={createForm.price}
               onChange={(e) =>
                 setCreateForm((prev) => ({ ...prev, price: e.target.value }))
@@ -418,7 +476,7 @@ export default function VendorProductsPage() {
               min="0"
               step="0.01"
               className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-              placeholder="Old Price"
+              placeholder={t("field_old_price")}
               value={createForm.old_price}
               onChange={(e) =>
                 setCreateForm((prev) => ({
@@ -432,7 +490,7 @@ export default function VendorProductsPage() {
               min="0"
               step="0.01"
               className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-              placeholder="Cost Price"
+              placeholder={t("field_cost_price")}
               value={createForm.cost_price}
               onChange={(e) =>
                 setCreateForm((prev) => ({
@@ -443,7 +501,7 @@ export default function VendorProductsPage() {
             />
             <input
               className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-              placeholder="SKU"
+              placeholder={t("field_sku")}
               value={createForm.sku}
               onChange={(e) =>
                 setCreateForm((prev) => ({ ...prev, sku: e.target.value }))
@@ -453,13 +511,32 @@ export default function VendorProductsPage() {
               type="number"
               min="0"
               className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-              placeholder="Quantity"
+              placeholder={t("field_quantity")}
               value={createForm.quantity}
               onChange={(e) =>
                 setCreateForm((prev) => ({ ...prev, quantity: e.target.value }))
               }
               required
             />
+
+            <select
+              className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+              value={createForm.product_type}
+              onChange={(e) =>
+                setCreateForm((prev) => ({
+                  ...prev,
+                  product_type: e.target
+                    .value as ProductFormState["product_type"],
+                }))
+              }
+            >
+              <option value="general">General</option>
+              <option value="clothing">Clothing</option>
+              <option value="automotive">Automotive</option>
+              <option value="food">Food</option>
+              <option value="electronics">Electronics</option>
+              <option value="other">Other</option>
+            </select>
 
             <select
               className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
@@ -472,13 +549,226 @@ export default function VendorProductsPage() {
               }
               required
             >
-              <option value="">Select category</option>
+              <option value="">{t("vendor_products_select_category")}</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
                 </option>
               ))}
             </select>
+
+            <div className="space-y-2 md:col-span-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Specifications</p>
+                <button
+                  type="button"
+                  className="rounded border border-slate-300 px-2 py-1 text-xs dark:border-slate-700"
+                  onClick={() =>
+                    setCreateSpecifications((prev) => [
+                      ...prev,
+                      createSpecificationRow(),
+                    ])
+                  }
+                >
+                  + Add spec
+                </button>
+              </div>
+              {createSpecifications.map((row) => (
+                <div
+                  key={row.id}
+                  className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto]"
+                >
+                  <input
+                    className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+                    placeholder="Key (e.g. material)"
+                    value={row.key}
+                    onChange={(e) =>
+                      setCreateSpecifications((prev) =>
+                        prev.map((item) =>
+                          item.id === row.id
+                            ? { ...item, key: e.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <input
+                    className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+                    placeholder="Value"
+                    value={row.value}
+                    onChange={(e) =>
+                      setCreateSpecifications((prev) =>
+                        prev.map((item) =>
+                          item.id === row.id
+                            ? { ...item, value: e.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="rounded border border-rose-300 px-2 py-1 text-xs text-rose-700 dark:border-rose-700 dark:text-rose-300"
+                    onClick={() =>
+                      setCreateSpecifications((prev) =>
+                        prev.length > 1
+                          ? prev.filter((item) => item.id !== row.id)
+                          : [createSpecificationRow()],
+                      )
+                    }
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Variants</p>
+                <button
+                  type="button"
+                  className="rounded border border-slate-300 px-2 py-1 text-xs dark:border-slate-700"
+                  onClick={() =>
+                    setCreateVariants((prev) => [...prev, createVariantRow()])
+                  }
+                >
+                  + Add variant
+                </button>
+              </div>
+              {createVariants.map((row) => (
+                <div
+                  key={row.id}
+                  className="grid grid-cols-2 gap-2 md:grid-cols-5"
+                >
+                  <input
+                    className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                    placeholder="SKU"
+                    value={row.sku}
+                    onChange={(e) =>
+                      setCreateVariants((prev) =>
+                        prev.map((item) =>
+                          item.id === row.id
+                            ? { ...item, sku: e.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <input
+                    className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                    placeholder="Price"
+                    value={row.price}
+                    onChange={(e) =>
+                      setCreateVariants((prev) =>
+                        prev.map((item) =>
+                          item.id === row.id
+                            ? { ...item, price: e.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <input
+                    className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                    placeholder="Qty"
+                    value={row.quantity}
+                    onChange={(e) =>
+                      setCreateVariants((prev) =>
+                        prev.map((item) =>
+                          item.id === row.id
+                            ? { ...item, quantity: e.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <input
+                    className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                    placeholder="Color"
+                    value={row.color}
+                    onChange={(e) =>
+                      setCreateVariants((prev) =>
+                        prev.map((item) =>
+                          item.id === row.id
+                            ? { ...item, color: e.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <input
+                    className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                    placeholder="Size"
+                    value={row.size}
+                    onChange={(e) =>
+                      setCreateVariants((prev) =>
+                        prev.map((item) =>
+                          item.id === row.id
+                            ? { ...item, size: e.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <input
+                    className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                    placeholder="Make"
+                    value={row.make}
+                    onChange={(e) =>
+                      setCreateVariants((prev) =>
+                        prev.map((item) =>
+                          item.id === row.id
+                            ? { ...item, make: e.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <input
+                    className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                    placeholder="Model"
+                    value={row.model}
+                    onChange={(e) =>
+                      setCreateVariants((prev) =>
+                        prev.map((item) =>
+                          item.id === row.id
+                            ? { ...item, model: e.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <input
+                    className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                    placeholder="Year"
+                    value={row.year}
+                    onChange={(e) =>
+                      setCreateVariants((prev) =>
+                        prev.map((item) =>
+                          item.id === row.id
+                            ? { ...item, year: e.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="rounded border border-rose-300 px-2 py-1 text-xs text-rose-700 dark:border-rose-700 dark:text-rose-300"
+                    onClick={() =>
+                      setCreateVariants((prev) =>
+                        prev.length > 1
+                          ? prev.filter((item) => item.id !== row.id)
+                          : [createVariantRow()],
+                      )
+                    }
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
 
             <div className="flex items-center gap-4 text-sm">
               <label className="flex items-center gap-2">
@@ -492,7 +782,7 @@ export default function VendorProductsPage() {
                     }))
                   }
                 />{" "}
-                Active
+                {t("vendor_products_active")}
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -505,12 +795,12 @@ export default function VendorProductsPage() {
                     }))
                   }
                 />{" "}
-                Featured
+                {t("vendor_products_featured")}
               </label>
             </div>
 
             <label className="text-sm md:col-span-2">
-              Images
+              {t("vendor_products_images")}
               <input
                 type="file"
                 multiple
@@ -523,7 +813,7 @@ export default function VendorProductsPage() {
             </label>
 
             <label className="text-sm md:col-span-2">
-              Videos
+              {t("vendor_products_videos")}
               <input
                 type="file"
                 multiple
@@ -540,7 +830,9 @@ export default function VendorProductsPage() {
               className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-slate-950 md:col-span-2"
               disabled={createMutation.isPending}
             >
-              {createMutation.isPending ? "Creating..." : "Create product"}
+              {createMutation.isPending
+                ? t("vendor_products_creating")
+                : t("vendor_products_create_btn")}
             </button>
           </fieldset>
         </form>
@@ -550,14 +842,17 @@ export default function VendorProductsPage() {
         <section className="mb-8 rounded-2xl bg-card p-5 shadow-soft md:p-7">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold">
-              Edit Product #{editingProductId}
+              {t("vendor_products_edit_title").replace(
+                "{id}",
+                String(editingProductId),
+              )}
             </h2>
             <button
               type="button"
               className="rounded-lg border border-slate-300 px-3 py-1 text-sm dark:border-slate-700"
               onClick={() => setEditingProductId(null)}
             >
-              Cancel
+              {t("common_cancel")}
             </button>
           </div>
 
@@ -568,7 +863,7 @@ export default function VendorProductsPage() {
             <fieldset disabled={isEditBusy} className="contents">
               <input
                 className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-                placeholder="Name"
+                placeholder={t("field_name")}
                 value={editForm.name}
                 onChange={(e) =>
                   setEditForm((prev) => ({ ...prev, name: e.target.value }))
@@ -577,7 +872,7 @@ export default function VendorProductsPage() {
               />
               <input
                 className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-                placeholder="Name EN"
+                placeholder={t("field_name_en")}
                 value={editForm.name_en}
                 onChange={(e) =>
                   setEditForm((prev) => ({ ...prev, name_en: e.target.value }))
@@ -586,7 +881,7 @@ export default function VendorProductsPage() {
               />
               <textarea
                 className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-                placeholder="Description"
+                placeholder={t("field_description")}
                 value={editForm.description}
                 onChange={(e) =>
                   setEditForm((prev) => ({
@@ -598,7 +893,7 @@ export default function VendorProductsPage() {
               />
               <textarea
                 className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-                placeholder="Description EN"
+                placeholder={t("field_description_en")}
                 value={editForm.description_en}
                 onChange={(e) =>
                   setEditForm((prev) => ({
@@ -613,7 +908,7 @@ export default function VendorProductsPage() {
                 min="0"
                 step="0.01"
                 className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-                placeholder="Price"
+                placeholder={t("field_price")}
                 value={editForm.price}
                 onChange={(e) =>
                   setEditForm((prev) => ({ ...prev, price: e.target.value }))
@@ -625,7 +920,7 @@ export default function VendorProductsPage() {
                 min="0"
                 step="0.01"
                 className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-                placeholder="Old Price"
+                placeholder={t("field_old_price")}
                 value={editForm.old_price}
                 onChange={(e) =>
                   setEditForm((prev) => ({
@@ -639,7 +934,7 @@ export default function VendorProductsPage() {
                 min="0"
                 step="0.01"
                 className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-                placeholder="Cost Price"
+                placeholder={t("field_cost_price")}
                 value={editForm.cost_price}
                 onChange={(e) =>
                   setEditForm((prev) => ({
@@ -650,7 +945,7 @@ export default function VendorProductsPage() {
               />
               <input
                 className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-                placeholder="SKU"
+                placeholder={t("field_sku")}
                 value={editForm.sku}
                 onChange={(e) =>
                   setEditForm((prev) => ({ ...prev, sku: e.target.value }))
@@ -660,13 +955,32 @@ export default function VendorProductsPage() {
                 type="number"
                 min="0"
                 className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-                placeholder="Quantity"
+                placeholder={t("field_quantity")}
                 value={editForm.quantity}
                 onChange={(e) =>
                   setEditForm((prev) => ({ ...prev, quantity: e.target.value }))
                 }
                 required
               />
+
+              <select
+                className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+                value={editForm.product_type}
+                onChange={(e) =>
+                  setEditForm((prev) => ({
+                    ...prev,
+                    product_type: e.target
+                      .value as ProductFormState["product_type"],
+                  }))
+                }
+              >
+                <option value="general">General</option>
+                <option value="clothing">Clothing</option>
+                <option value="automotive">Automotive</option>
+                <option value="food">Food</option>
+                <option value="electronics">Electronics</option>
+                <option value="other">Other</option>
+              </select>
 
               <select
                 className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
@@ -679,13 +993,226 @@ export default function VendorProductsPage() {
                 }
                 required
               >
-                <option value="">Select category</option>
+                <option value="">{t("vendor_products_select_category")}</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
                   </option>
                 ))}
               </select>
+
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Specifications</p>
+                  <button
+                    type="button"
+                    className="rounded border border-slate-300 px-2 py-1 text-xs dark:border-slate-700"
+                    onClick={() =>
+                      setEditSpecifications((prev) => [
+                        ...prev,
+                        createSpecificationRow(),
+                      ])
+                    }
+                  >
+                    + Add spec
+                  </button>
+                </div>
+                {editSpecifications.map((row) => (
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto]"
+                  >
+                    <input
+                      className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+                      placeholder="Key"
+                      value={row.key}
+                      onChange={(e) =>
+                        setEditSpecifications((prev) =>
+                          prev.map((item) =>
+                            item.id === row.id
+                              ? { ...item, key: e.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+                      placeholder="Value"
+                      value={row.value}
+                      onChange={(e) =>
+                        setEditSpecifications((prev) =>
+                          prev.map((item) =>
+                            item.id === row.id
+                              ? { ...item, value: e.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="rounded border border-rose-300 px-2 py-1 text-xs text-rose-700 dark:border-rose-700 dark:text-rose-300"
+                      onClick={() =>
+                        setEditSpecifications((prev) =>
+                          prev.length > 1
+                            ? prev.filter((item) => item.id !== row.id)
+                            : [createSpecificationRow()],
+                        )
+                      }
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Variants</p>
+                  <button
+                    type="button"
+                    className="rounded border border-slate-300 px-2 py-1 text-xs dark:border-slate-700"
+                    onClick={() =>
+                      setEditVariants((prev) => [...prev, createVariantRow()])
+                    }
+                  >
+                    + Add variant
+                  </button>
+                </div>
+                {editVariants.map((row) => (
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-2 gap-2 md:grid-cols-5"
+                  >
+                    <input
+                      className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                      placeholder="SKU"
+                      value={row.sku}
+                      onChange={(e) =>
+                        setEditVariants((prev) =>
+                          prev.map((item) =>
+                            item.id === row.id
+                              ? { ...item, sku: e.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                      placeholder="Price"
+                      value={row.price}
+                      onChange={(e) =>
+                        setEditVariants((prev) =>
+                          prev.map((item) =>
+                            item.id === row.id
+                              ? { ...item, price: e.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                      placeholder="Qty"
+                      value={row.quantity}
+                      onChange={(e) =>
+                        setEditVariants((prev) =>
+                          prev.map((item) =>
+                            item.id === row.id
+                              ? { ...item, quantity: e.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                      placeholder="Color"
+                      value={row.color}
+                      onChange={(e) =>
+                        setEditVariants((prev) =>
+                          prev.map((item) =>
+                            item.id === row.id
+                              ? { ...item, color: e.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                      placeholder="Size"
+                      value={row.size}
+                      onChange={(e) =>
+                        setEditVariants((prev) =>
+                          prev.map((item) =>
+                            item.id === row.id
+                              ? { ...item, size: e.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                      placeholder="Make"
+                      value={row.make}
+                      onChange={(e) =>
+                        setEditVariants((prev) =>
+                          prev.map((item) =>
+                            item.id === row.id
+                              ? { ...item, make: e.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                      placeholder="Model"
+                      value={row.model}
+                      onChange={(e) =>
+                        setEditVariants((prev) =>
+                          prev.map((item) =>
+                            item.id === row.id
+                              ? { ...item, model: e.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                      placeholder="Year"
+                      value={row.year}
+                      onChange={(e) =>
+                        setEditVariants((prev) =>
+                          prev.map((item) =>
+                            item.id === row.id
+                              ? { ...item, year: e.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="rounded border border-rose-300 px-2 py-1 text-xs text-rose-700 dark:border-rose-700 dark:text-rose-300"
+                      onClick={() =>
+                        setEditVariants((prev) =>
+                          prev.length > 1
+                            ? prev.filter((item) => item.id !== row.id)
+                            : [createVariantRow()],
+                        )
+                      }
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
 
               <div className="flex items-center gap-4 text-sm">
                 <label className="flex items-center gap-2">
@@ -699,7 +1226,7 @@ export default function VendorProductsPage() {
                       }))
                     }
                   />{" "}
-                  Active
+                  {t("vendor_products_active")}
                 </label>
                 <label className="flex items-center gap-2">
                   <input
@@ -712,12 +1239,12 @@ export default function VendorProductsPage() {
                       }))
                     }
                   />{" "}
-                  Featured
+                  {t("vendor_products_featured")}
                 </label>
               </div>
 
               <label className="text-sm md:col-span-2">
-                Replace/Add Images
+                {t("vendor_products_replace_images")}
                 <input
                   type="file"
                   multiple
@@ -730,7 +1257,7 @@ export default function VendorProductsPage() {
               </label>
 
               <label className="text-sm md:col-span-2">
-                Replace/Add Videos
+                {t("vendor_products_replace_videos")}
                 <input
                   type="file"
                   multiple
@@ -747,7 +1274,9 @@ export default function VendorProductsPage() {
                 className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-slate-950 md:col-span-2"
                 disabled={updateMutation.isPending}
               >
-                {updateMutation.isPending ? "Saving..." : "Save changes"}
+                {updateMutation.isPending
+                  ? t("vendor_products_saving")
+                  : t("vendor_products_save_changes")}
               </button>
             </fieldset>
           </form>
@@ -755,7 +1284,7 @@ export default function VendorProductsPage() {
       ) : null}
 
       {productsQuery.isLoading ? (
-        <p className="text-sm text-muted">Loading products...</p>
+        <p className="text-sm text-muted">{t("vendor_products_loading")}</p>
       ) : null}
 
       <section className="space-y-4">
@@ -767,13 +1296,18 @@ export default function VendorProductsPage() {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h3 className="text-lg font-semibold">{product.name}</h3>
-                <p className="text-sm text-muted">SKU: {product.sku || "-"}</p>
                 <p className="text-sm text-muted">
-                  Price: ${Number(product.price).toFixed(2)} | Qty:{" "}
-                  {product.quantity ?? 0}
+                  {t("field_sku")}: {product.sku || "-"}
                 </p>
                 <p className="text-sm text-muted">
-                  Status: {product.is_active ? "Active" : "Inactive"}
+                  {t("field_price")}: ${Number(product.price).toFixed(2)} |{" "}
+                  {t("field_quantity")}: {product.quantity ?? 0}
+                </p>
+                <p className="text-sm text-muted">
+                  {t("vendor_status")}:{" "}
+                  {product.is_active
+                    ? t("profile_active")
+                    : t("profile_inactive")}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -783,7 +1317,9 @@ export default function VendorProductsPage() {
                   onClick={() => startEdit(product)}
                   disabled={isProductBusy(product.id)}
                 >
-                  {isProductBusy(product.id) ? "Working..." : "Edit"}
+                  {isProductBusy(product.id)
+                    ? t("common_working")
+                    : t("admin_edit")}
                 </button>
                 <button
                   type="button"
@@ -791,7 +1327,7 @@ export default function VendorProductsPage() {
                   onClick={() => handleDelete(product.id)}
                   disabled={isProductBusy(product.id)}
                 >
-                  Delete
+                  {t("admin_delete")}
                 </button>
               </div>
             </div>
@@ -799,11 +1335,11 @@ export default function VendorProductsPage() {
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <section>
                 <div className="mb-2 flex items-center justify-between">
-                  <h4 className="font-medium">Images</h4>
+                  <h4 className="font-medium">{t("vendor_products_images")}</h4>
                   <label
                     className={`cursor-pointer rounded-lg border border-slate-300 px-3 py-1 text-xs dark:border-slate-700 ${isProductBusy(product.id) ? "pointer-events-none opacity-50" : ""}`}
                   >
-                    Upload
+                    {t("common_upload")}
                     <input
                       type="file"
                       multiple
@@ -835,7 +1371,7 @@ export default function VendorProductsPage() {
                         {image.name}
                       </p>
                       <p className="text-[11px] text-cyan-700 dark:text-cyan-300">
-                        Uploading...
+                        {t("common_uploading")}
                       </p>
                     </div>
                   ))}
@@ -851,7 +1387,7 @@ export default function VendorProductsPage() {
                         rel="noreferrer"
                         className="truncate text-xs text-accent"
                       >
-                        {image.image || "Image"}
+                        {image.image || t("common_image")}
                       </a>
                       <div className="flex gap-2">
                         {!image.is_primary ? (
@@ -869,15 +1405,15 @@ export default function VendorProductsPage() {
                                       imageId: image.id,
                                     })
                                     .then(() => undefined),
-                                "Primary image updated",
+                                t("vendor_products_primary_updated"),
                               );
                             }}
                           >
-                            Set primary
+                            {t("vendor_products_set_primary")}
                           </button>
                         ) : (
                           <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                            Primary
+                            {t("vendor_products_primary")}
                           </span>
                         )}
                         <button
@@ -894,11 +1430,11 @@ export default function VendorProductsPage() {
                                     imageId: image.id,
                                   })
                                   .then(() => undefined),
-                              "Image deleted",
+                              t("vendor_products_image_deleted"),
                             );
                           }}
                         >
-                          Delete
+                          {t("admin_delete")}
                         </button>
                       </div>
                     </div>
@@ -908,11 +1444,11 @@ export default function VendorProductsPage() {
 
               <section>
                 <div className="mb-2 flex items-center justify-between">
-                  <h4 className="font-medium">Videos</h4>
+                  <h4 className="font-medium">{t("vendor_products_videos")}</h4>
                   <label
                     className={`cursor-pointer rounded-lg border border-slate-300 px-3 py-1 text-xs dark:border-slate-700 ${isProductBusy(product.id) ? "pointer-events-none opacity-50" : ""}`}
                   >
-                    Upload
+                    {t("common_upload")}
                     <input
                       type="file"
                       multiple
@@ -945,7 +1481,7 @@ export default function VendorProductsPage() {
                         {video.name}
                       </p>
                       <p className="text-[11px] text-cyan-700 dark:text-cyan-300">
-                        Uploading...
+                        {t("common_uploading")}
                       </p>
                     </div>
                   ))}
@@ -961,7 +1497,7 @@ export default function VendorProductsPage() {
                         rel="noreferrer"
                         className="truncate text-xs text-accent"
                       >
-                        {video.title || video.video || "Video"}
+                        {video.title || video.video || t("common_video")}
                       </a>
                       <button
                         type="button"
@@ -977,11 +1513,11 @@ export default function VendorProductsPage() {
                                   videoId: video.id,
                                 })
                                 .then(() => undefined),
-                            "Video deleted",
+                            t("vendor_products_video_deleted"),
                           );
                         }}
                       >
-                        Delete
+                        {t("admin_delete")}
                       </button>
                     </div>
                   ))}
@@ -992,7 +1528,9 @@ export default function VendorProductsPage() {
         ))}
 
         {!productsQuery.isLoading && products.length === 0 ? (
-          <p className="text-sm text-muted">No products found.</p>
+          <p className="text-sm text-muted">
+            {t("vendor_products_no_products")}
+          </p>
         ) : null}
       </section>
 

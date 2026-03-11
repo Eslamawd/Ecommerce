@@ -26,11 +26,29 @@ import {
   useToggleProductFeatured,
   useUpdateAdminProduct,
 } from "../../../src/hooks/use-admin";
+import { useLanguage } from "../../../src/components/language-provider";
 import { getApiErrorMessages } from "../../../src/lib/api-client";
+import {
+  createSpecificationRow,
+  createVariantRow,
+  fromSpecificationsObject,
+  fromVariants,
+  toSpecificationsObject,
+  toVariantsPayload,
+  type SpecificationRow,
+  type VariantRow,
+} from "../../../src/lib/product-form-utils";
 
 type ProductForm = {
   name: string;
   name_en: string;
+  product_type:
+    | "general"
+    | "clothing"
+    | "automotive"
+    | "food"
+    | "electronics"
+    | "other";
   description: string;
   description_en: string;
   price: string;
@@ -46,6 +64,7 @@ type ProductForm = {
 const EMPTY_FORM: ProductForm = {
   name: "",
   name_en: "",
+  product_type: "general",
   description: "",
   description_en: "",
   price: "",
@@ -69,6 +88,10 @@ export default function AdminProductsPage() {
   const [form, setForm] = useState<ProductForm>(EMPTY_FORM);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [videoFiles, setVideoFiles] = useState<File[]>([]);
+  const [specifications, setSpecifications] = useState<SpecificationRow[]>([
+    createSpecificationRow(),
+  ]);
+  const [variants, setVariants] = useState<VariantRow[]>([createVariantRow()]);
 
   const productsQuery = useAdminProducts(page);
   const categoriesQuery = useAdminCategories();
@@ -82,6 +105,7 @@ export default function AdminProductsPage() {
   const setPrimaryMutation = useSetAdminProductPrimaryImage();
   const createMutation = useCreateAdminProduct();
   const updateMutation = useUpdateAdminProduct();
+  const { t } = useLanguage();
 
   const products = productsQuery.data?.data ?? [];
   const categories = categoriesQuery.data ?? [];
@@ -119,20 +143,23 @@ export default function AdminProductsPage() {
     event.preventDefault();
 
     if (!form.category_id) {
-      toast.error("Select category");
+      toast.error(t("admin_products_select_category"));
       return;
     }
 
     const payload = {
       name: form.name,
       name_en: form.name_en,
+      product_type: form.product_type,
       description: form.description,
       description_en: form.description_en,
+      specifications: toSpecificationsObject(specifications),
       price: Number(form.price),
       old_price: form.old_price ? Number(form.old_price) : null,
       cost_price: form.cost_price ? Number(form.cost_price) : null,
       sku: form.sku || null,
       quantity: Number(form.quantity),
+      variants: toVariantsPayload(variants),
       category_id: Number(form.category_id),
       is_active: form.is_active,
       is_featured: form.is_featured,
@@ -146,16 +173,18 @@ export default function AdminProductsPage() {
           productId: editingId,
           body: payload,
         });
-        toast.success("Product updated");
+        toast.success(t("admin_products_updated"));
       } else {
         await createMutation.mutateAsync(payload);
-        toast.success("Product created");
+        toast.success(t("admin_products_created"));
       }
 
       setEditingId(null);
       setForm(EMPTY_FORM);
       setImageFiles([]);
       setVideoFiles([]);
+      setSpecifications([createSpecificationRow()]);
+      setVariants([createVariantRow()]);
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
@@ -166,6 +195,14 @@ export default function AdminProductsPage() {
     setForm({
       name: product.name,
       name_en: product.name_en ?? product.name,
+      product_type:
+        product.product_type === "clothing" ||
+        product.product_type === "automotive" ||
+        product.product_type === "food" ||
+        product.product_type === "electronics" ||
+        product.product_type === "other"
+          ? product.product_type
+          : "general",
       description: product.description ?? "",
       description_en: product.description_en ?? product.description ?? "",
       price: String(product.price ?? ""),
@@ -179,12 +216,14 @@ export default function AdminProductsPage() {
     });
     setImageFiles([]);
     setVideoFiles([]);
+    setSpecifications(fromSpecificationsObject(product.specifications));
+    setVariants(fromVariants(product.variants));
   };
 
   const removeExistingImage = async (productId: number, imageId: number) => {
     try {
       await deleteImageMutation.mutateAsync({ productId, imageId });
-      toast.success("Image deleted");
+      toast.success(t("admin_products_image_deleted"));
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
@@ -193,7 +232,7 @@ export default function AdminProductsPage() {
   const removeExistingVideo = async (productId: number, videoId: number) => {
     try {
       await deleteVideoMutation.mutateAsync({ productId, videoId });
-      toast.success("Video deleted");
+      toast.success(t("admin_products_video_deleted"));
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
@@ -202,7 +241,7 @@ export default function AdminProductsPage() {
   const makePrimaryImage = async (productId: number, imageId: number) => {
     try {
       await setPrimaryMutation.mutateAsync({ productId, imageId });
-      toast.success("Primary image updated");
+      toast.success(t("admin_products_primary_updated"));
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
@@ -211,7 +250,7 @@ export default function AdminProductsPage() {
   const toggleActive = async (productId: number) => {
     try {
       await toggleActiveMutation.mutateAsync(productId);
-      toast.success("Product active status updated");
+      toast.success(t("admin_products_active_updated"));
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
@@ -220,7 +259,7 @@ export default function AdminProductsPage() {
   const toggleFeatured = async (productId: number) => {
     try {
       await toggleFeaturedMutation.mutateAsync(productId);
-      toast.success("Product featured status updated");
+      toast.success(t("admin_products_featured_updated"));
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
@@ -229,7 +268,7 @@ export default function AdminProductsPage() {
   const deleteProduct = async (productId: number) => {
     try {
       await deleteMutation.mutateAsync(productId);
-      toast.success("Product deleted");
+      toast.success(t("admin_products_deleted"));
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
@@ -255,13 +294,13 @@ export default function AdminProductsPage() {
           <div>
             <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 dark:bg-slate-800/80 dark:text-slate-200">
               <Sparkles className="h-3.5 w-3.5" />
-              Premium Admin
+              {t("admin_products_premium")}
             </p>
             <h1 className="text-3xl font-black tracking-tight md:text-4xl">
-              Product Command Center
+              {t("admin_products_command_center")}
             </h1>
             <p className="mt-1 text-sm text-muted">
-              إدارة المنتجات بحركة ناعمة وتجربة أكثر فخامة.
+              {t("admin_products_subtitle")}
             </p>
           </div>
         </div>
@@ -275,9 +314,21 @@ export default function AdminProductsPage() {
         className="grid grid-cols-1 gap-3 md:grid-cols-3"
       >
         {[
-          { label: "Total", value: products.length, Icon: Boxes },
-          { label: "Active", value: activeCount, Icon: ShieldCheck },
-          { label: "Featured", value: featuredCount, Icon: Star },
+          {
+            label: t("admin_products_total"),
+            value: products.length,
+            Icon: Boxes,
+          },
+          {
+            label: t("admin_products_active"),
+            value: activeCount,
+            Icon: ShieldCheck,
+          },
+          {
+            label: t("admin_products_featured"),
+            value: featuredCount,
+            Icon: Star,
+          },
         ].map(({ label, value, Icon }) => (
           <motion.article
             key={label}
@@ -303,7 +354,9 @@ export default function AdminProductsPage() {
         className="rounded-2xl border border-slate-200/80 bg-card p-4 shadow-soft dark:border-slate-700/70"
       >
         <h2 className="mb-3 text-lg font-semibold">
-          {editingId ? `Edit Product #${editingId}` : "Create Product"}
+          {editingId
+            ? t("admin_products_edit_title").replace("{id}", String(editingId))
+            : t("admin_products_create_title")}
         </h2>
 
         <form
@@ -312,14 +365,14 @@ export default function AdminProductsPage() {
         >
           <input
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="Name"
+            placeholder={t("field_name")}
             value={form.name}
             onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
             required
           />
           <input
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="Name EN"
+            placeholder={t("field_name_en")}
             value={form.name_en}
             onChange={(e) =>
               setForm((p) => ({ ...p, name_en: e.target.value }))
@@ -328,7 +381,7 @@ export default function AdminProductsPage() {
           />
           <textarea
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="Description"
+            placeholder={t("field_description")}
             value={form.description}
             onChange={(e) =>
               setForm((p) => ({ ...p, description: e.target.value }))
@@ -337,7 +390,7 @@ export default function AdminProductsPage() {
           />
           <textarea
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="Description EN"
+            placeholder={t("field_description_en")}
             value={form.description_en}
             onChange={(e) =>
               setForm((p) => ({ ...p, description_en: e.target.value }))
@@ -349,17 +402,35 @@ export default function AdminProductsPage() {
             min="0"
             step="0.01"
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="Price"
+            placeholder={t("field_price")}
             value={form.price}
             onChange={(e) => setForm((p) => ({ ...p, price: e.target.value }))}
             required
           />
+
+          <select
+            className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+            value={form.product_type}
+            onChange={(e) =>
+              setForm((p) => ({
+                ...p,
+                product_type: e.target.value as ProductForm["product_type"],
+              }))
+            }
+          >
+            <option value="general">General</option>
+            <option value="clothing">Clothing</option>
+            <option value="automotive">Automotive</option>
+            <option value="food">Food</option>
+            <option value="electronics">Electronics</option>
+            <option value="other">Other</option>
+          </select>
           <input
             type="number"
             min="0"
             step="0.01"
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="Old Price"
+            placeholder={t("field_old_price")}
             value={form.old_price}
             onChange={(e) =>
               setForm((p) => ({ ...p, old_price: e.target.value }))
@@ -370,7 +441,7 @@ export default function AdminProductsPage() {
             min="0"
             step="0.01"
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="Cost Price"
+            placeholder={t("field_cost_price")}
             value={form.cost_price}
             onChange={(e) =>
               setForm((p) => ({ ...p, cost_price: e.target.value }))
@@ -378,7 +449,7 @@ export default function AdminProductsPage() {
           />
           <input
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="SKU"
+            placeholder={t("field_sku")}
             value={form.sku}
             onChange={(e) => setForm((p) => ({ ...p, sku: e.target.value }))}
           />
@@ -386,7 +457,7 @@ export default function AdminProductsPage() {
             type="number"
             min="0"
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="Quantity"
+            placeholder={t("field_quantity")}
             value={form.quantity}
             onChange={(e) =>
               setForm((p) => ({ ...p, quantity: e.target.value }))
@@ -402,7 +473,7 @@ export default function AdminProductsPage() {
             }
             required
           >
-            <option value="">Select category</option>
+            <option value="">{t("admin_products_select_category")}</option>
             {categoryOptions.map((category) => (
               <option key={category.id} value={category.id}>
                 {`${"  ".repeat(category.depth)}${category.name}`}
@@ -419,7 +490,7 @@ export default function AdminProductsPage() {
                   setForm((p) => ({ ...p, is_active: e.target.checked }))
                 }
               />{" "}
-              Active
+              {t("admin_products_active")}
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -429,13 +500,15 @@ export default function AdminProductsPage() {
                   setForm((p) => ({ ...p, is_featured: e.target.checked }))
                 }
               />{" "}
-              Featured
+              {t("admin_products_featured")}
             </label>
           </div>
 
           <div className="md:col-span-2 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label className="space-y-1 text-sm">
-              <span className="text-muted">Upload images</span>
+              <span className="text-muted">
+                {t("admin_products_upload_images")}
+              </span>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -448,7 +521,9 @@ export default function AdminProductsPage() {
             </label>
 
             <label className="space-y-1 text-sm">
-              <span className="text-muted">Upload videos</span>
+              <span className="text-muted">
+                {t("admin_products_upload_videos")}
+              </span>
               <input
                 type="file"
                 accept="video/mp4,video/quicktime,video/x-msvideo"
@@ -461,18 +536,237 @@ export default function AdminProductsPage() {
             </label>
           </div>
 
+          <div className="space-y-2 md:col-span-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold">Specifications</p>
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-2 py-1 text-xs dark:border-slate-700"
+                onClick={() =>
+                  setSpecifications((prev) => [
+                    ...prev,
+                    createSpecificationRow(),
+                  ])
+                }
+              >
+                + Add spec
+              </button>
+            </div>
+            {specifications.map((row) => (
+              <div
+                key={row.id}
+                className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_auto]"
+              >
+                <input
+                  className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+                  placeholder="Key"
+                  value={row.key}
+                  onChange={(e) =>
+                    setSpecifications((prev) =>
+                      prev.map((item) =>
+                        item.id === row.id
+                          ? { ...item, key: e.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+                <input
+                  className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
+                  placeholder="Value"
+                  value={row.value}
+                  onChange={(e) =>
+                    setSpecifications((prev) =>
+                      prev.map((item) =>
+                        item.id === row.id
+                          ? { ...item, value: e.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+                <button
+                  type="button"
+                  className="rounded border border-rose-300 px-2 py-1 text-xs text-rose-700 dark:border-rose-700 dark:text-rose-300"
+                  onClick={() =>
+                    setSpecifications((prev) =>
+                      prev.length > 1
+                        ? prev.filter((item) => item.id !== row.id)
+                        : [createSpecificationRow()],
+                    )
+                  }
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold">Variants</p>
+              <button
+                type="button"
+                className="rounded border border-slate-300 px-2 py-1 text-xs dark:border-slate-700"
+                onClick={() =>
+                  setVariants((prev) => [...prev, createVariantRow()])
+                }
+              >
+                + Add variant
+              </button>
+            </div>
+            {variants.map((row) => (
+              <div
+                key={row.id}
+                className="grid grid-cols-2 gap-2 md:grid-cols-5"
+              >
+                <input
+                  className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                  placeholder="SKU"
+                  value={row.sku}
+                  onChange={(e) =>
+                    setVariants((prev) =>
+                      prev.map((item) =>
+                        item.id === row.id
+                          ? { ...item, sku: e.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+                <input
+                  className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                  placeholder="Price"
+                  value={row.price}
+                  onChange={(e) =>
+                    setVariants((prev) =>
+                      prev.map((item) =>
+                        item.id === row.id
+                          ? { ...item, price: e.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+                <input
+                  className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                  placeholder="Qty"
+                  value={row.quantity}
+                  onChange={(e) =>
+                    setVariants((prev) =>
+                      prev.map((item) =>
+                        item.id === row.id
+                          ? { ...item, quantity: e.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+                <input
+                  className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                  placeholder="Color"
+                  value={row.color}
+                  onChange={(e) =>
+                    setVariants((prev) =>
+                      prev.map((item) =>
+                        item.id === row.id
+                          ? { ...item, color: e.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+                <input
+                  className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                  placeholder="Size"
+                  value={row.size}
+                  onChange={(e) =>
+                    setVariants((prev) =>
+                      prev.map((item) =>
+                        item.id === row.id
+                          ? { ...item, size: e.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+                <input
+                  className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                  placeholder="Make"
+                  value={row.make}
+                  onChange={(e) =>
+                    setVariants((prev) =>
+                      prev.map((item) =>
+                        item.id === row.id
+                          ? { ...item, make: e.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+                <input
+                  className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                  placeholder="Model"
+                  value={row.model}
+                  onChange={(e) =>
+                    setVariants((prev) =>
+                      prev.map((item) =>
+                        item.id === row.id
+                          ? { ...item, model: e.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+                <input
+                  className="rounded-lg border border-slate-300 bg-transparent px-2 py-2 text-xs dark:border-slate-700"
+                  placeholder="Year"
+                  value={row.year}
+                  onChange={(e) =>
+                    setVariants((prev) =>
+                      prev.map((item) =>
+                        item.id === row.id
+                          ? { ...item, year: e.target.value }
+                          : item,
+                      ),
+                    )
+                  }
+                />
+                <button
+                  type="button"
+                  className="rounded border border-rose-300 px-2 py-1 text-xs text-rose-700 dark:border-rose-700 dark:text-rose-300"
+                  onClick={() =>
+                    setVariants((prev) =>
+                      prev.length > 1
+                        ? prev.filter((item) => item.id !== row.id)
+                        : [createVariantRow()],
+                    )
+                  }
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+
           {editingId ? (
             <div className="md:col-span-2 grid grid-cols-1 gap-3 lg:grid-cols-2">
               <div className="rounded-xl border border-slate-200/80 p-3 dark:border-slate-700">
-                <p className="mb-2 text-sm font-semibold">Existing images</p>
+                <p className="mb-2 text-sm font-semibold">
+                  {t("admin_products_existing_images")}
+                </p>
 
                 {productDetailsQuery.isLoading ? (
-                  <p className="text-xs text-muted">Loading product media...</p>
+                  <p className="text-xs text-muted">
+                    {t("admin_products_loading_media")}
+                  </p>
                 ) : null}
 
                 {!productDetailsQuery.isLoading &&
                 existingImages.length === 0 ? (
-                  <p className="text-xs text-muted">No images uploaded yet.</p>
+                  <p className="text-xs text-muted">
+                    {t("admin_products_no_images")}
+                  </p>
                 ) : null}
 
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
@@ -483,13 +777,13 @@ export default function AdminProductsPage() {
                     >
                       <img
                         src={image.image ?? ""}
-                        alt="Product"
+                        alt={t("common_product")}
                         className="h-24 w-full object-cover"
                       />
                       <div className="space-y-1 p-2">
                         {primaryImageId === image.id ? (
                           <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                            Primary image
+                            {t("admin_products_primary_image")}
                           </p>
                         ) : (
                           <button
@@ -500,7 +794,7 @@ export default function AdminProductsPage() {
                             }
                             disabled={setPrimaryMutation.isPending}
                           >
-                            Set as primary
+                            {t("admin_products_set_primary")}
                           </button>
                         )}
                         <button
@@ -512,7 +806,7 @@ export default function AdminProductsPage() {
                           }
                           disabled={deleteImageMutation.isPending}
                         >
-                          Delete image
+                          {t("admin_products_delete_image")}
                         </button>
                       </div>
                     </div>
@@ -521,15 +815,21 @@ export default function AdminProductsPage() {
               </div>
 
               <div className="rounded-xl border border-slate-200/80 p-3 dark:border-slate-700">
-                <p className="mb-2 text-sm font-semibold">Existing videos</p>
+                <p className="mb-2 text-sm font-semibold">
+                  {t("admin_products_existing_videos")}
+                </p>
 
                 {productDetailsQuery.isLoading ? (
-                  <p className="text-xs text-muted">Loading product media...</p>
+                  <p className="text-xs text-muted">
+                    {t("admin_products_loading_media")}
+                  </p>
                 ) : null}
 
                 {!productDetailsQuery.isLoading &&
                 existingVideos.length === 0 ? (
-                  <p className="text-xs text-muted">No videos uploaded yet.</p>
+                  <p className="text-xs text-muted">
+                    {t("admin_products_no_videos")}
+                  </p>
                 ) : null}
 
                 <div className="space-y-2">
@@ -551,7 +851,7 @@ export default function AdminProductsPage() {
                         }
                         disabled={deleteVideoMutation.isPending}
                       >
-                        Delete video
+                        {t("admin_products_delete_video")}
                       </button>
                     </div>
                   ))}
@@ -567,7 +867,7 @@ export default function AdminProductsPage() {
               disabled={createMutation.isPending || updateMutation.isPending}
             >
               <PencilLine className="h-4 w-4" />
-              {editingId ? "Save" : "Create"}
+              {editingId ? t("common_save") : t("common_create")}
             </button>
             {editingId ? (
               <button
@@ -578,21 +878,23 @@ export default function AdminProductsPage() {
                   setForm(EMPTY_FORM);
                   setImageFiles([]);
                   setVideoFiles([]);
+                  setSpecifications([createSpecificationRow()]);
+                  setVariants([createVariantRow()]);
                 }}
               >
-                Cancel
+                {t("common_cancel")}
               </button>
             ) : null}
             <span className="ml-auto inline-flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-xs text-muted dark:bg-slate-800">
               <Boxes className="h-3.5 w-3.5" />
-              Low stock: {lowStockCount}
+              {t("admin_products_low_stock")}: {lowStockCount}
             </span>
           </div>
         </form>
       </motion.section>
 
       {productsQuery.isLoading ? (
-        <p className="text-sm text-muted">Loading products...</p>
+        <p className="text-sm text-muted">{t("admin_products_loading")}</p>
       ) : null}
 
       {productsQuery.isError ? (
@@ -619,10 +921,10 @@ export default function AdminProductsPage() {
                 <div>
                   <h2 className="font-semibold">{product.name}</h2>
                   <p className="text-sm text-muted">
-                    SKU: {product.sku || "-"}
+                    {t("field_sku")}: {product.sku || "-"}
                   </p>
                   <p className="text-sm text-muted">
-                    Stock: {product.quantity ?? 0}
+                    {t("product_stock")}: {product.quantity ?? 0}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -632,7 +934,7 @@ export default function AdminProductsPage() {
                     onClick={() => startEdit(product)}
                   >
                     <PencilLine className="h-3.5 w-3.5" />
-                    Edit
+                    {t("admin_edit")}
                   </button>
                   <button
                     type="button"
@@ -640,7 +942,7 @@ export default function AdminProductsPage() {
                     onClick={() => toggleActive(product.id)}
                   >
                     <ShieldCheck className="h-3.5 w-3.5" />
-                    Toggle active
+                    {t("admin_products_toggle_active")}
                   </button>
                   <button
                     type="button"
@@ -648,7 +950,7 @@ export default function AdminProductsPage() {
                     onClick={() => toggleFeatured(product.id)}
                   >
                     <Star className="h-3.5 w-3.5" />
-                    Toggle featured
+                    {t("admin_products_toggle_featured")}
                   </button>
                   <button
                     type="button"
@@ -656,7 +958,7 @@ export default function AdminProductsPage() {
                     onClick={() => deleteProduct(product.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    Delete
+                    {t("admin_delete")}
                   </button>
                 </div>
               </div>
@@ -671,7 +973,7 @@ export default function AdminProductsPage() {
             className="rounded-2xl border border-dashed border-slate-300/80 bg-card/60 p-8 text-center text-sm text-muted dark:border-slate-700"
           >
             <ImagePlus className="mx-auto mb-2 h-5 w-5" />
-            No products yet. Create one from the panel above.
+            {t("admin_products_no_products")}
           </motion.div>
         ) : null}
       </section>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { ThemeToggle } from "../../src/components/theme-toggle";
+import { useLanguage } from "../../src/components/language-provider";
 import { isAuthenticated } from "../../src/lib/auth";
 import { useLogout, useMe } from "../../src/hooks/use-auth";
 
@@ -11,6 +12,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const meQuery = useMe();
   const logoutMutation = useLogout();
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -32,7 +34,7 @@ export default function ProfilePage() {
     <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center justify-center p-6">
       <section className="w-full rounded-2xl bg-card p-6 shadow-soft md:p-8">
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <h1 className="text-2xl font-semibold">My Profile</h1>
+          <h1 className="text-2xl font-semibold">{t("profile_title")}</h1>
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <button
@@ -41,41 +43,46 @@ export default function ProfilePage() {
               className="rounded-xl border border-slate-300 px-4 py-2 text-sm transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
               disabled={logoutMutation.isPending}
             >
-              {logoutMutation.isPending ? "Logging out..." : "Logout"}
+              {logoutMutation.isPending
+                ? t("profile_logging_out")
+                : t("profile_logout")}
             </button>
           </div>
         </div>
 
         {meQuery.isLoading ? (
-          <p className="text-sm text-muted">Loading profile...</p>
+          <p className="text-sm text-muted">{t("profile_loading")}</p>
         ) : null}
 
         {meQuery.isError ? (
           <div className="space-y-3 rounded-xl bg-rose-100 p-4 text-sm text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-            <p>
-              {(meQuery.error as Error)?.message ?? "Failed to load profile."}
-            </p>
+            <p>{(meQuery.error as Error)?.message ?? t("profile_failed")}</p>
             <Link
               href="/login"
               className="font-medium text-accent hover:underline"
             >
-              Go to login
+              {t("profile_go_login")}
             </Link>
           </div>
         ) : null}
 
         {user ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <InfoItem label="Name" value={user.name} />
-            <InfoItem label="Email" value={user.email} />
-            <InfoItem label="Phone" value={user.phone || "-"} />
+            <InfoItem label={t("profile_name")} value={user.name} />
+            <InfoItem label={t("profile_email")} value={user.email} />
+            <InfoItem label={t("profile_phone")} value={user.phone || "-"} />
             <InfoItem
-              label="Status"
-              value={user.is_active ? "Active" : "Inactive"}
+              label={t("profile_status")}
+              value={
+                user.is_active ? t("profile_active") : t("profile_inactive")
+              }
             />
-            <InfoItem label="Roles" value={user.roles.join(", ")} />
             <InfoItem
-              label="Created"
+              label={t("profile_roles")}
+              value={user.roles.join(", ")}
+            />
+            <InfoItem
+              label={t("profile_created")}
               value={new Date(user.created_at).toLocaleString()}
             />
           </div>

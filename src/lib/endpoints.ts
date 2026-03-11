@@ -2,6 +2,9 @@ export const ENDPOINTS = {
   auth: {
     login: "/auth/login",
     register: "/auth/register",
+    forgotPassword: "/auth/forgot-password",
+    resetPassword: "/auth/reset-password",
+    resendVerification: "/auth/email/verification-notification",
     logout: "/auth/logout",
     me: "/auth/me",
   },
@@ -13,6 +16,13 @@ export const ENDPOINTS = {
     list: "/products",
     bySlug: (slug: string) => `/products/${slug}`,
     reviews: (productId: number | string) => `/products/${productId}/reviews`,
+  },
+  search: {
+    global: "/search",
+    suggestions: "/search/suggestions",
+  },
+  reviews: {
+    byId: (id: number | string) => `/reviews/${id}`,
   },
   cart: {
     details: "/cart",
@@ -34,6 +44,10 @@ export const ENDPOINTS = {
   payments: {
     initiate: "/payments/initiate",
     status: (orderNumber: string) => `/payments/${orderNumber}/status`,
+    refund: (orderNumber: string) => `/payments/${orderNumber}/refund`,
+  },
+  coupons: {
+    validate: "/coupons/validate",
   },
   notifications: {
     list: "/notifications",
@@ -44,8 +58,14 @@ export const ENDPOINTS = {
   },
   admin: {
     dashboardOverview: "/admin/dashboard/overview",
+    dashboardRevenueChart: "/admin/dashboard/revenue-chart",
+    dashboardOrdersChart: "/admin/dashboard/orders-chart",
     dashboardTopProducts: "/admin/dashboard/top-products",
+    dashboardTopVendors: "/admin/dashboard/top-vendors",
+    dashboardTopCustomers: "/admin/dashboard/top-customers",
     dashboardRecentOrders: "/admin/dashboard/recent-orders",
+    dashboardRecentReviews: "/admin/dashboard/recent-reviews",
+    dashboardLowStock: "/admin/dashboard/low-stock",
     users: "/admin/users",
     userById: (id: number | string) => `/admin/users/${id}`,
     userToggleActive: (id: number | string) =>
@@ -59,10 +79,17 @@ export const ENDPOINTS = {
       `/admin/products/${id}/toggle-featured`,
     productDelete: (id: number | string) => `/admin/products/${id}`,
     orders: "/admin/orders",
+    ordersStatistics: "/admin/orders/statistics",
+    ordersExport: "/admin/orders/export",
     orderByNumber: (orderNumber: string) => `/admin/orders/${orderNumber}`,
     orderStatus: (orderNumber: string) => `/admin/orders/${orderNumber}/status`,
+    coupons: "/admin/coupons",
+    couponById: (id: number | string) => `/admin/coupons/${id}`,
+    reviews: "/admin/reviews",
+    reviewApprove: (id: number | string) => `/admin/reviews/${id}/approve`,
     categories: "/admin/categories",
     categoryById: (id: number | string) => `/admin/categories/${id}`,
+    settings: "/admin/settings",
   },
   vendor: {
     orders: "/vendor/orders",

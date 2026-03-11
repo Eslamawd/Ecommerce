@@ -75,13 +75,28 @@ export function useVendorOrdersPage(page = 1) {
 export type VendorProductPayload = {
   name?: string;
   name_en?: string;
+  product_type?:
+    | "general"
+    | "clothing"
+    | "automotive"
+    | "food"
+    | "electronics"
+    | "other"
+    | string;
   description?: string;
   description_en?: string;
+  specifications?: Record<string, unknown> | null;
   price?: number;
   old_price?: number | null;
   cost_price?: number | null;
   sku?: string | null;
   quantity?: number;
+  variants?: Array<{
+    sku?: string | null;
+    price: number;
+    quantity: number;
+    attributes?: Record<string, unknown>;
+  }> | null;
   category_id?: number;
   is_active?: boolean;
   is_featured?: boolean;
@@ -108,13 +123,22 @@ function buildProductFormData(
 
   append("name", payload.name);
   append("name_en", payload.name_en);
+  append("product_type", payload.product_type);
   append("description", payload.description);
   append("description_en", payload.description_en);
+  append(
+    "specifications",
+    payload.specifications ? JSON.stringify(payload.specifications) : undefined,
+  );
   append("price", payload.price);
   append("old_price", payload.old_price);
   append("cost_price", payload.cost_price);
   append("sku", payload.sku);
   append("quantity", payload.quantity);
+  append(
+    "variants",
+    payload.variants ? JSON.stringify(payload.variants) : undefined,
+  );
   append("category_id", payload.category_id);
   append("is_active", payload.is_active);
   append("is_featured", payload.is_featured);

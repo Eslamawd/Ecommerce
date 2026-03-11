@@ -26,11 +26,9 @@ export async function POST(request: NextRequest) {
     | undefined;
   const token = (payload as { data?: { token?: string } }).data?.token;
 
+  // In email-verification mode, backend intentionally returns no token.
   if (!token || !user) {
-    return NextResponse.json(
-      { message: "Invalid auth response." },
-      { status: 500 },
-    );
+    return NextResponse.json(payload, { status: backendResponse.status });
   }
 
   const response = NextResponse.json({

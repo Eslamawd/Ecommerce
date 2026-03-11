@@ -4,9 +4,12 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { PaginationControls } from "../../../src/components/pagination-controls";
 import {
+  useAdminOrderStatistics,
+  useAdminOrdersExport,
   useAdminOrders,
   useUpdateOrderStatus,
 } from "../../../src/hooks/use-admin";
+import { useLanguage } from "../../../src/components/language-provider";
 import { getApiErrorMessages } from "../../../src/lib/api-client";
 import { formatDate } from "../../../src/lib/date";
 import type { OrderStatus, PaymentStatus } from "../../../src/types/order";
@@ -31,7 +34,10 @@ const PAYMENT_STATUSES: PaymentStatus[] = [
 export default function AdminOrdersPage() {
   const [page, setPage] = useState(1);
   const ordersQuery = useAdminOrders(page);
+  const statsQuery = useAdminOrderStatistics();
+  const exportMutation = useAdminOrdersExport();
   const updateStatusMutation = useUpdateOrderStatus();
+  const { t } = useLanguage();
 
   const orders = ordersQuery.data?.data ?? [];
   const paginationMeta = ordersQuery.data?.meta;
@@ -51,18 +57,65 @@ export default function AdminOrdersPage() {
         status,
         payment_status,
       });
-      toast.success("Order status updated");
+      toast.success(t("admin_order_status_updated"));
     } catch (error) {
       toast.error(getApiErrorMessages(error).join(" | "));
     }
   };
 
+  const exportOrders = async () => {
+    try {
+      const payload = await exportMutation.mutateAsync();
+      toast.success(
+        t("admin_export_loaded").replace("{total}", String(payload.total)),
+      );
+      // Keep it simple for now: make data available quickly to ops users.
+      console.table(payload.orders.slice(0, 25));
+    } catch (error) {
+      toast.error(getApiErrorMessages(error).join(" | "));
+    }
+  };
+
+  const stats = statsQuery.data?.statistics;
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-6xl p-6 md:p-10">
-      <h1 className="mb-6 text-3xl font-bold">Admin Orders</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-bold">{t("admin_orders_title")}</h1>
+        <button
+          type="button"
+          onClick={exportOrders}
+          className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700"
+        >
+          {t("admin_export_orders")}
+        </button>
+      </div>
+
+      {stats ? (
+        <section className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <article className="rounded-xl bg-card p-3 shadow-soft">
+            <p className="text-xs text-muted">{t("admin_total_orders")}</p>
+            <p className="text-xl font-bold">{stats.total}</p>
+          </article>
+          <article className="rounded-xl bg-card p-3 shadow-soft">
+            <p className="text-xs text-muted">{t("admin_revenue")}</p>
+            <p className="text-xl font-bold">
+              ${Number(stats.total_revenue).toFixed(0)}
+            </p>
+          </article>
+          <article className="rounded-xl bg-card p-3 shadow-soft">
+            <p className="text-xs text-muted">{t("admin_today")}</p>
+            <p className="text-xl font-bold">{stats.today}</p>
+          </article>
+          <article className="rounded-xl bg-card p-3 shadow-soft">
+            <p className="text-xs text-muted">{t("admin_this_month")}</p>
+            <p className="text-xl font-bold">{stats.this_month}</p>
+          </article>
+        </section>
+      ) : null}
 
       {ordersQuery.isLoading ? (
-        <p className="text-sm text-muted">Loading orders...</p>
+        <p className="text-sm text-muted">{t("admin_loading_orders")}</p>
       ) : null}
 
       <section className="space-y-3">
@@ -75,10 +128,20 @@ export default function AdminOrdersPage() {
               <div>
                 <h2 className="font-semibold">{order.order_number}</h2>
                 <p className="text-sm text-muted">
-                  Current: {order.status} / {order.payment_status}
+                  {t("admin_current")}: {order.status} / {order.payment_status}
                 </p>
                 <p className="text-xs text-muted">
-                  Created: {formatDate(order.created_at)}
+                  {t("admin_created")}: {formatDate(order.created_at)}
+                </p>
+                <p className="text-xs text-muted">
+                  {t("admin_customer")}: {order.user?.name || "-"}
+                </p>
+                <p className="text-xs text-muted">
+                  {t("admin_phone")}: {order.shipping_phone || "-"} |{" "}
+                  {t("admin_city")}: {order.shipping_city || "-"}
+                </p>
+                <p className="text-xs text-muted">
+                  {t("admin_address")}: {order.shipping_address || "-"}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -119,11 +182,23 @@ export default function AdminOrdersPage() {
                 </select>
               </div>
             </div>
+
+            <div className="mt-3 rounded-lg border border-slate-200/80 p-3 text-sm dark:border-slate-700/80">
+              <p className="mb-1 font-medium">{t("admin_order_items")}</p>
+              <div className="space-y-1 text-muted">
+                {order.items?.map((item) => (
+                  <p key={item.id}>
+                    {item.product_name || t("common_product")} x {item.quantity}{" "}
+                    = ${Number(item.subtotal).toFixed(2)}
+                  </p>
+                ))}
+              </div>
+            </div>
           </article>
         ))}
 
         {!ordersQuery.isLoading && orders.length === 0 ? (
-          <p className="text-sm text-muted">No orders found.</p>
+          <p className="text-sm text-muted">{t("admin_no_orders_found")}</p>
         ) : null}
       </section>
 

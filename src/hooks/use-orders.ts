@@ -19,7 +19,7 @@ type CreateOrderInput = {
   shipping_email?: string;
   shipping_latitude?: number;
   shipping_longitude?: number;
-  payment_method: "cash_on_delivery" | "online";
+  payment_method: "cash_on_delivery";
   coupon_code?: string;
   notes?: string;
 };
@@ -132,5 +132,51 @@ export function usePaymentStatus(orderNumber?: string) {
         { auth: true },
       ),
     enabled: Boolean(orderNumber && getAccessToken()),
+  });
+}
+
+export function useRefundPayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (orderNumber: string) =>
+      apiRequest<{ message: string; order_number: string }>(
+        ENDPOINTS.payments.refund(orderNumber),
+        {
+          method: "POST",
+          auth: true,
+        },
+      ),
+    onSuccess: (_, orderNumber) => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({
+        queryKey: ["payments", "status", orderNumber],
+      });
+    },
+  });
+}
+
+export function useValidateCoupon() {
+  return useMutation({
+    mutationFn: ({
+      code,
+      order_total,
+    }: {
+      code: string;
+      order_total?: number;
+    }) =>
+      apiRequest<{
+        coupon: {
+          id: number;
+          code: string;
+          type: "fixed" | "percentage";
+          value: number;
+        };
+        discount: number;
+      }>(ENDPOINTS.coupons.validate, {
+        method: "POST",
+        auth: true,
+        body: { code, order_total },
+      }),
   });
 }

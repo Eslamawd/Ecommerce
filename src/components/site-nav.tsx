@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Bell,
   BriefcaseBusiness,
   ChevronRight,
   House,
@@ -21,19 +22,12 @@ import {
   X,
 } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
+import { LanguageToggle } from "./language-toggle";
+import { useLanguage } from "./language-provider";
 import { useLogout, useMe } from "../hooks/use-auth";
 import { isAuthenticated } from "../lib/auth";
-
-const PUBLIC_LINKS = [
-  { href: "/", label: "Home", icon: House },
-  { href: "/categories", label: "Shop", icon: Store },
-];
-
-const AUTH_LINKS = [
-  { href: "/cart", label: "Cart", icon: ShoppingCart },
-  { href: "/orders", label: "Orders", icon: Package },
-  { href: "/profile", label: "Profile", icon: User },
-];
+import { useCart } from "../hooks/use-cart";
+import { useUnreadNotifications } from "../hooks/use-notifications";
 
 export function SiteNav() {
   const pathname = usePathname();
@@ -41,6 +35,9 @@ export function SiteNav() {
   const logoutMutation = useLogout();
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { t } = useLanguage();
+  const cartQuery = useCart();
+  const unreadNotificationsQuery = useUnreadNotifications();
 
   useEffect(() => {
     setMounted(true);
@@ -68,14 +65,41 @@ export function SiteNav() {
   const isAdmin = roles.includes("admin");
   const isVendor = roles.includes("vendor") || roles.includes("admin");
 
+  const PUBLIC_LINKS = [
+    { href: "/", label: t("nav_home"), icon: House },
+    { href: "/categories", label: t("nav_shop"), icon: Store },
+  ];
+
+  const AUTH_LINKS = [
+    { href: "/cart", label: t("nav_cart"), icon: ShoppingCart },
+    { href: "/notifications", label: t("notifications_title"), icon: Bell },
+    { href: "/orders", label: t("nav_orders"), icon: Package },
+    { href: "/profile", label: t("nav_profile"), icon: User },
+  ];
+
+  const cartCount = authed ? (cartQuery.data?.items_count ?? 0) : 0;
+  const unreadCount = authed ? (unreadNotificationsQuery.data?.count ?? 0) : 0;
+
+  const getBadgeCount = (href: string): number => {
+    if (href === "/cart") {
+      return cartCount;
+    }
+
+    if (href === "/notifications") {
+      return unreadCount;
+    }
+
+    return 0;
+  };
+
   const links = [
     ...PUBLIC_LINKS,
     ...(authed ? AUTH_LINKS : []),
     ...(isVendor
-      ? [{ href: "/vendor", label: "Vendor", icon: BriefcaseBusiness }]
+      ? [{ href: "/vendor", label: t("nav_vendor"), icon: BriefcaseBusiness }]
       : []),
     ...(isAdmin
-      ? [{ href: "/admin", label: "Admin", icon: LayoutDashboard }]
+      ? [{ href: "/admin", label: t("nav_admin"), icon: LayoutDashboard }]
       : []),
   ];
 
@@ -116,7 +140,14 @@ export function SiteNav() {
                       : "items-center gap-1.5 border border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   }`}
                 >
-                  <Icon className="h-3.5 w-3.5" />
+                  <span className="relative inline-flex">
+                    <Icon className="h-3.5 w-3.5" />
+                    {getBadgeCount(link.href) > 0 ? (
+                      <span className="absolute -right-2 -top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                        {Math.min(getBadgeCount(link.href), 99)}
+                      </span>
+                    ) : null}
+                  </span>
                   {link.label}
                 </Link>
               );
@@ -125,6 +156,7 @@ export function SiteNav() {
         </div>
 
         <div className="hidden items-center gap-2 md:flex">
+          <LanguageToggle />
           <ThemeToggle />
 
           {!authed ? (
@@ -134,14 +166,14 @@ export function SiteNav() {
                 className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 <LogIn className="h-3.5 w-3.5" />
-                Login
+                {t("nav_login")}
               </Link>
               <Link
                 href="/register"
                 className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-accent px-3 py-1.5 text-sm font-semibold text-slate-950"
               >
                 <UserPlus className="h-3.5 w-3.5" />
-                Register
+                {t("nav_register")}
               </Link>
             </>
           ) : (
@@ -152,16 +184,19 @@ export function SiteNav() {
               className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-rose-300 px-3 py-1.5 text-sm text-rose-700 disabled:opacity-60 dark:border-rose-800 dark:text-rose-300"
             >
               <LogOut className="h-3.5 w-3.5" />
-              {logoutMutation.isPending ? "Signing out..." : "Logout"}
+              {logoutMutation.isPending
+                ? t("nav_signing_out")
+                : t("nav_logout")}
             </button>
           )}
         </div>
 
         <div className="flex items-center gap-2 md:hidden">
+          <LanguageToggle />
           <ThemeToggle />
           <button
             type="button"
-            aria-label="Open mobile menu"
+            aria-label={t("nav_open_mobile_menu")}
             className="inline-flex items-center rounded-full border border-slate-300 bg-white p-2 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             onClick={() => setMobileOpen(true)}
           >
@@ -175,7 +210,7 @@ export function SiteNav() {
           <>
             <motion.button
               type="button"
-              aria-label="Close mobile menu"
+              aria-label={t("nav_close_mobile_menu")}
               className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-[2px]"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -197,12 +232,12 @@ export function SiteNav() {
                     Ecom
                   </div>
                   <p className="mt-2 text-xs uppercase tracking-[0.18em] text-muted">
-                    Navigation
+                    {t("nav_navigation")}
                   </p>
                 </div>
                 <button
                   type="button"
-                  aria-label="Close mobile menu"
+                  aria-label={t("nav_close_mobile_menu")}
                   className="inline-flex items-center rounded-full border border-slate-300 bg-white p-2 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                   onClick={() => setMobileOpen(false)}
                 >
@@ -240,7 +275,14 @@ export function SiteNav() {
                         }`}
                       >
                         <span className="inline-flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
+                          <span className="relative inline-flex">
+                            <Icon className="h-4 w-4" />
+                            {getBadgeCount(link.href) > 0 ? (
+                              <span className="absolute -right-2 -top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                                {Math.min(getBadgeCount(link.href), 99)}
+                              </span>
+                            ) : null}
+                          </span>
                           {link.label}
                         </span>
                         <ChevronRight className="h-4 w-4 opacity-70" />
@@ -258,14 +300,14 @@ export function SiteNav() {
                       className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                     >
                       <LogIn className="h-3.5 w-3.5" />
-                      Login
+                      {t("nav_login")}
                     </Link>
                     <Link
                       href="/register"
                       className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-sm font-semibold text-slate-950"
                     >
                       <UserPlus className="h-3.5 w-3.5" />
-                      Register
+                      {t("nav_register")}
                     </Link>
                   </div>
                 ) : (
@@ -276,7 +318,9 @@ export function SiteNav() {
                     className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-rose-300 px-3 py-2 text-sm text-rose-700 disabled:opacity-60 dark:border-rose-800 dark:text-rose-300"
                   >
                     <LogOut className="h-3.5 w-3.5" />
-                    {logoutMutation.isPending ? "Signing out..." : "Logout"}
+                    {logoutMutation.isPending
+                      ? t("nav_signing_out")
+                      : t("nav_logout")}
                   </button>
                 )}
               </div>

@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "../src/components/theme-provider";
+import { LanguageProvider } from "../src/components/language-provider";
 
 type AppProviderProps = {
   children: React.ReactNode;
@@ -15,11 +16,13 @@ const AppProvider = ({ children }: AppProviderProps) => {
 
   return (
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        {children}
-        <Toaster position="top-right" />
-        <ReactQueryDevtools initialIsOpen={false} />
-      </QueryClientProvider>
+      <LanguageProvider>
+        <QueryClientProvider client={queryClient}>
+          {children}
+          <Toaster position="top-right" />
+          <ReactQueryDevtools initialIsOpen={false} />
+        </QueryClientProvider>
+      </LanguageProvider>
     </ThemeProvider>
   );
 };

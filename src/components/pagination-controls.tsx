@@ -1,5 +1,7 @@
 "use client";
 
+import { useLanguage } from "./language-provider";
+
 type PaginationControlsProps = {
   currentPage: number;
   lastPage: number;
@@ -13,8 +15,12 @@ export function PaginationControls({
   onPageChange,
   disabled,
 }: PaginationControlsProps) {
+  const { t } = useLanguage();
   const canGoPrev = currentPage > 1;
   const canGoNext = currentPage < lastPage;
+  const pageText = t("pagination_page_of")
+    .replace("{current}", String(currentPage))
+    .replace("{last}", String(lastPage));
 
   return (
     <div className="mt-6 flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 dark:border-slate-700">
@@ -24,12 +30,10 @@ export function PaginationControls({
         disabled={!canGoPrev || disabled}
         className="rounded-lg border border-slate-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700"
       >
-        Previous
+        {t("pagination_previous")}
       </button>
 
-      <p className="text-sm text-muted">
-        Page {currentPage} of {lastPage}
-      </p>
+      <p className="text-sm text-muted">{pageText}</p>
 
       <button
         type="button"
@@ -37,7 +41,7 @@ export function PaginationControls({
         disabled={!canGoNext || disabled}
         className="rounded-lg border border-slate-300 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700"
       >
-        Next
+        {t("pagination_next")}
       </button>
     </div>
   );

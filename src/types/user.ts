@@ -6,6 +6,8 @@ export type User = {
   email: string;
   phone: string | null;
   is_active: boolean;
+  email_verified_at?: string | null;
+  is_email_verified?: boolean;
   roles: UserRole[];
   created_at: string;
 };

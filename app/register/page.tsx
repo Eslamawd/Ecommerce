@@ -6,6 +6,7 @@ import { FormEvent, useState } from "react";
 import { ThemeToggle } from "../../src/components/theme-toggle";
 import { useRegister } from "../../src/hooks/use-auth";
 import { getApiErrorMessages } from "../../src/lib/api-client";
+import { useLanguage } from "../../src/components/language-provider";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -16,6 +17,7 @@ export default function RegisterPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
+  const { t } = useLanguage();
 
   const registerErrors = registerMutation.isError
     ? getApiErrorMessages(registerMutation.error)
@@ -25,13 +27,18 @@ export default function RegisterPage() {
     event.preventDefault();
 
     try {
-      await registerMutation.mutateAsync({
+      const result = await registerMutation.mutateAsync({
         name,
         email,
         phone: phone || undefined,
         password,
         password_confirmation: passwordConfirmation,
       });
+
+      if (result.requires_verification) {
+        router.push(`/login?verify=pending&email=${encodeURIComponent(email)}`);
+        return;
+      }
 
       router.push("/profile");
     } catch {
@@ -43,7 +50,7 @@ export default function RegisterPage() {
     <main className="mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center p-6">
       <section className="w-full max-w-lg rounded-2xl bg-card p-6 shadow-soft md:p-8">
         <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Create Account</h1>
+          <h1 className="text-2xl font-semibold">{t("register_title")}</h1>
           <ThemeToggle />
         </div>
 
@@ -53,7 +60,7 @@ export default function RegisterPage() {
         >
           <div className="md:col-span-2">
             <label className="mb-1 block text-sm text-muted" htmlFor="name">
-              Name
+              {t("register_name")}
             </label>
             <input
               id="name"
@@ -67,7 +74,7 @@ export default function RegisterPage() {
 
           <div>
             <label className="mb-1 block text-sm text-muted" htmlFor="email">
-              Email
+              {t("register_email")}
             </label>
             <input
               id="email"
@@ -81,7 +88,7 @@ export default function RegisterPage() {
 
           <div>
             <label className="mb-1 block text-sm text-muted" htmlFor="phone">
-              Phone (optional)
+              {t("register_phone_optional")}
             </label>
             <input
               id="phone"
@@ -94,7 +101,7 @@ export default function RegisterPage() {
 
           <div>
             <label className="mb-1 block text-sm text-muted" htmlFor="password">
-              Password
+              {t("register_password")}
             </label>
             <input
               id="password"
@@ -111,7 +118,7 @@ export default function RegisterPage() {
               className="mb-1 block text-sm text-muted"
               htmlFor="password_confirmation"
             >
-              Confirm password
+              {t("register_confirm_password")}
             </label>
             <input
               id="password_confirmation"
@@ -125,7 +132,7 @@ export default function RegisterPage() {
 
           {registerMutation.isError ? (
             <div className="md:col-span-2 rounded-lg bg-rose-100 px-3 py-2 text-sm text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-              <p className="font-medium">Please review the following:</p>
+              <p className="font-medium">{t("register_review_errors")}</p>
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 {registerErrors.map((message, index) => (
                   <li key={`${message}-${index}`}>{message}</li>
@@ -140,18 +147,18 @@ export default function RegisterPage() {
             className="md:col-span-2 w-full rounded-xl bg-accent px-4 py-2 font-medium text-slate-950 transition hover:opacity-90 disabled:opacity-60"
           >
             {registerMutation.isPending
-              ? "Creating account..."
-              : "Create account"}
+              ? t("register_creating")
+              : t("register_create_account")}
           </button>
         </form>
 
         <p className="mt-5 text-sm text-muted">
-          Already have an account?{" "}
+          {t("register_have_account")}{" "}
           <Link
             href="/login"
             className="font-medium text-accent hover:underline"
           >
-            Sign in
+            {t("register_sign_in")}
           </Link>
         </p>
       </section>

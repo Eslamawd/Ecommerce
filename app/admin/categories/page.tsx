@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FolderTree,
@@ -18,6 +18,7 @@ import {
   useDeleteAdminCategory,
   useUpdateAdminCategory,
 } from "../../../src/hooks/use-admin";
+import { useLanguage } from "../../../src/components/language-provider";
 import { getApiErrorMessages } from "../../../src/lib/api-client";
 
 type CategoryForm = {
@@ -57,6 +58,34 @@ export default function AdminCategoriesPage() {
     image?: string | null;
     video?: string | null;
   } | null>(null);
+  const { t } = useLanguage();
+
+  const selectedImagePreview = useMemo(() => {
+    if (!imageFile) {
+      return null;
+    }
+
+    return URL.createObjectURL(imageFile);
+  }, [imageFile]);
+
+  const selectedVideoPreview = useMemo(() => {
+    if (!videoFile) {
+      return null;
+    }
+
+    return URL.createObjectURL(videoFile);
+  }, [videoFile]);
+
+  useEffect(() => {
+    return () => {
+      if (selectedImagePreview) {
+        URL.revokeObjectURL(selectedImagePreview);
+      }
+      if (selectedVideoPreview) {
+        URL.revokeObjectURL(selectedVideoPreview);
+      }
+    };
+  }, [selectedImagePreview, selectedVideoPreview]);
 
   const categoriesQuery = useAdminCategories();
   const createMutation = useCreateAdminCategory();
@@ -138,7 +167,9 @@ export default function AdminCategoriesPage() {
     Boolean(form.parent_id) && invalidParentIds.has(Number(form.parent_id));
 
   const selectableParentCategories = useMemo(() => {
-    return flatCategories.filter((category) => !invalidParentIds.has(category.id));
+    return flatCategories.filter(
+      (category) => !invalidParentIds.has(category.id),
+    );
   }, [flatCategories, invalidParentIds]);
 
   const renderCategoryNode = (
@@ -160,12 +191,15 @@ export default function AdminCategoriesPage() {
             <h3 className="font-semibold">{category.name}</h3>
             <p className="text-sm text-muted">Slug: {category.slug}</p>
             <p className="text-xs text-muted">
-              Level: {depth + 1}
-              {category.parent_id ? ` | Parent #${category.parent_id}` : " | Root"}
+              {t("admin_categories_level")}: {depth + 1}
+              {category.parent_id
+                ? ` | ${t("admin_categories_parent")} #${category.parent_id}`
+                : ` | ${t("admin_categories_root")}`}
             </p>
             {category.children?.length ? (
               <p className="text-xs text-muted">
-                Subcategories: {category.children.length}
+                {t("admin_categories_subcategories")}:{" "}
+                {category.children.length}
               </p>
             ) : null}
           </div>
@@ -176,7 +210,7 @@ export default function AdminCategoriesPage() {
               onClick={() => startEdit(category)}
             >
               <PencilLine className="h-3.5 w-3.5" />
-              Edit
+              {t("admin_edit")}
             </button>
             <button
               type="button"
@@ -184,14 +218,16 @@ export default function AdminCategoriesPage() {
               onClick={() => remove(category.id)}
             >
               <Trash2 className="h-3.5 w-3.5" />
-              Delete
+              {t("admin_delete")}
             </button>
           </div>
         </div>
 
         {category.children?.length ? (
           <div className="mt-3 space-y-2 border-l border-dashed border-slate-300/80 pl-3 dark:border-slate-700">
-            {category.children.map((child) => renderCategoryNode(child, depth + 1))}
+            {category.children.map((child) =>
+              renderCategoryNode(child, depth + 1),
+            )}
           </div>
         ) : null}
       </motion.article>
@@ -202,10 +238,8 @@ export default function AdminCategoriesPage() {
     event.preventDefault();
 
     if (isSelectedParentInvalid) {
-      setParentValidationMessage(
-        "Invalid parent: you cannot set the category itself (or one of its children) as parent.",
-      );
-      toast.error("Invalid parent category selection");
+      setParentValidationMessage(t("admin_categories_invalid_parent"));
+      toast.error(t("admin_categories_invalid_parent_select"));
       return;
     }
 
@@ -227,10 +261,10 @@ export default function AdminCategoriesPage() {
           categoryId: editingId,
           body: payload,
         });
-        toast.success("Category updated");
+        toast.success(t("admin_categories_updated"));
       } else {
         await createMutation.mutateAsync(payload);
-        toast.success("Category created");
+        toast.success(t("admin_categories_created"));
       }
 
       setEditingId(null);
@@ -261,8 +295,7 @@ export default function AdminCategoriesPage() {
       name_en: category.name_en ?? "",
       description: category.description ?? "",
       description_en: category.description_en ?? "",
-      parent_id:
-        category.parent_id == null ? "" : String(category.parent_id),
+      parent_id: category.parent_id == null ? "" : String(category.parent_id),
       sort_order: String(category.sort_order ?? 0),
       is_active: Boolean(category.is_active),
     });
@@ -273,13 +306,13 @@ export default function AdminCategoriesPage() {
   };
 
   const remove = async (id: number) => {
-    if (!window.confirm("Delete this category?")) {
+    if (!window.confirm(t("admin_categories_delete_confirm"))) {
       return;
     }
 
     try {
       await deleteMutation.mutateAsync(id);
-      toast.success("Category deleted");
+      toast.success(t("admin_categories_deleted"));
       if (editingId === id) {
         setEditingId(null);
         setForm(EMPTY_FORM);
@@ -310,13 +343,13 @@ export default function AdminCategoriesPage() {
         <div className="relative">
           <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 dark:bg-slate-800/80 dark:text-slate-200">
             <Sparkles className="h-3.5 w-3.5" />
-            Taxonomy Studio
+            {t("admin_categories_taxonomy_studio")}
           </p>
           <h1 className="text-3xl font-black tracking-tight md:text-4xl">
-            Category Management
+            {t("admin_categories_title")}
           </h1>
           <p className="mt-1 text-sm text-muted">
-            واجهة أنعم لإدارة التصنيفات بهوية بصرية أقوى.
+            {t("admin_categories_subtitle")}
           </p>
         </div>
       </motion.section>
@@ -329,9 +362,13 @@ export default function AdminCategoriesPage() {
         className="grid grid-cols-1 gap-3 md:grid-cols-2"
       >
         {[
-          { label: "Total Categories", value: categories.length, Icon: Shapes },
           {
-            label: "Active Categories",
+            label: t("admin_categories_total"),
+            value: categories.length,
+            Icon: Shapes,
+          },
+          {
+            label: t("admin_categories_active"),
             value: activeCategoriesCount,
             Icon: FolderTree,
           },
@@ -360,7 +397,12 @@ export default function AdminCategoriesPage() {
         className="rounded-2xl border border-slate-200/80 bg-card p-4 shadow-soft dark:border-slate-700/70"
       >
         <h2 className="mb-3 text-lg font-semibold">
-          {editingId ? `Edit Category #${editingId}` : "Create Category"}
+          {editingId
+            ? t("admin_categories_edit_title").replace(
+                "{id}",
+                String(editingId),
+              )
+            : t("admin_categories_create_title")}
         </h2>
 
         <form
@@ -369,14 +411,14 @@ export default function AdminCategoriesPage() {
         >
           <input
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="Name"
+            placeholder={t("field_name")}
             value={form.name}
             onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
             required
           />
           <input
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="Name EN"
+            placeholder={t("field_name_en")}
             value={form.name_en}
             onChange={(e) =>
               setForm((p) => ({ ...p, name_en: e.target.value }))
@@ -385,7 +427,7 @@ export default function AdminCategoriesPage() {
           />
           <textarea
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="Description"
+            placeholder={t("field_description")}
             value={form.description}
             onChange={(e) =>
               setForm((p) => ({ ...p, description: e.target.value }))
@@ -393,7 +435,7 @@ export default function AdminCategoriesPage() {
           />
           <textarea
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="Description EN"
+            placeholder={t("field_description_en")}
             value={form.description_en}
             onChange={(e) =>
               setForm((p) => ({ ...p, description_en: e.target.value }))
@@ -410,13 +452,11 @@ export default function AdminCategoriesPage() {
 
               setForm((p) => ({ ...p, parent_id: nextParent }));
               setParentValidationMessage(
-                invalid
-                  ? "Invalid parent: selected category creates a circular hierarchy."
-                  : null,
+                invalid ? t("admin_categories_invalid_parent_cycle") : null,
               );
             }}
           >
-            <option value="">No parent (root category)</option>
+            <option value="">{t("admin_categories_no_parent")}</option>
             {selectableParentCategories.map((category) => (
               <option key={category.id} value={category.id}>
                 {`${"  ".repeat(category.depth)}${category.name}`}
@@ -427,14 +467,14 @@ export default function AdminCategoriesPage() {
           {parentValidationMessage || isSelectedParentInvalid ? (
             <p className="text-xs text-rose-600 dark:text-rose-400 md:col-span-2">
               {parentValidationMessage ??
-                "Invalid parent selection. Please choose a different parent category."}
+                t("admin_categories_invalid_parent_help")}
             </p>
           ) : null}
 
           <input
             type="number"
             className="rounded-lg border border-slate-300 bg-transparent px-3 py-2 text-sm dark:border-slate-700"
-            placeholder="Sort Order"
+            placeholder={t("admin_categories_sort_order")}
             value={form.sort_order}
             onChange={(e) =>
               setForm((p) => ({ ...p, sort_order: e.target.value }))
@@ -449,14 +489,14 @@ export default function AdminCategoriesPage() {
                 setForm((p) => ({ ...p, is_active: e.target.checked }))
               }
             />
-            Active
+            {t("admin_categories_active_label")}
           </label>
 
           <div className="md:col-span-2 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label className="space-y-1 text-sm">
               <span className="inline-flex items-center gap-1.5 text-muted">
                 <ImagePlus className="h-3.5 w-3.5" />
-                Category image
+                {t("admin_categories_image")}
               </span>
               <input
                 type="file"
@@ -471,7 +511,7 @@ export default function AdminCategoriesPage() {
             <label className="space-y-1 text-sm">
               <span className="inline-flex items-center gap-1.5 text-muted">
                 <Film className="h-3.5 w-3.5" />
-                Category video
+                {t("admin_categories_video")}
               </span>
               <input
                 type="file"
@@ -484,10 +524,79 @@ export default function AdminCategoriesPage() {
             </label>
           </div>
 
-          {editingId && (editingMedia?.image || editingMedia?.video) ? (
-            <div className="md:col-span-2 grid grid-cols-1 gap-2 text-xs text-muted md:grid-cols-2">
-              <p>Current image: {editingMedia?.image ? "Available" : "-"}</p>
-              <p>Current video: {editingMedia?.video ? "Available" : "-"}</p>
+          {editingId ? (
+            <div className="md:col-span-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-200/80 p-3 dark:border-slate-700/80">
+                <p className="mb-2 text-xs uppercase tracking-[0.15em] text-muted">
+                  {t("admin_categories_current_image")}
+                </p>
+                {editingMedia?.image ? (
+                  <img
+                    src={editingMedia.image}
+                    alt={t("admin_categories_current_image")}
+                    className="h-40 w-full rounded-lg object-cover"
+                  />
+                ) : (
+                  <p className="text-sm text-muted">
+                    {t("admin_categories_no_current_image")}
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-slate-200/80 p-3 dark:border-slate-700/80">
+                <p className="mb-2 text-xs uppercase tracking-[0.15em] text-muted">
+                  {t("admin_categories_current_video")}
+                </p>
+                {editingMedia?.video ? (
+                  <video
+                    src={editingMedia.video}
+                    controls
+                    className="h-40 w-full rounded-lg object-cover"
+                  />
+                ) : (
+                  <p className="text-sm text-muted">
+                    {t("admin_categories_no_current_video")}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {selectedImagePreview || selectedVideoPreview ? (
+            <div className="md:col-span-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-cyan-300/70 p-3 dark:border-cyan-800/60">
+                <p className="mb-2 text-xs uppercase tracking-[0.15em] text-muted">
+                  {t("admin_categories_new_image_preview")}
+                </p>
+                {selectedImagePreview ? (
+                  <img
+                    src={selectedImagePreview}
+                    alt={t("admin_categories_new_image_preview")}
+                    className="h-40 w-full rounded-lg object-cover"
+                  />
+                ) : (
+                  <p className="text-sm text-muted">
+                    {t("admin_categories_no_new_image")}
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-cyan-300/70 p-3 dark:border-cyan-800/60">
+                <p className="mb-2 text-xs uppercase tracking-[0.15em] text-muted">
+                  {t("admin_categories_new_video_preview")}
+                </p>
+                {selectedVideoPreview ? (
+                  <video
+                    src={selectedVideoPreview}
+                    controls
+                    className="h-40 w-full rounded-lg object-cover"
+                  />
+                ) : (
+                  <p className="text-sm text-muted">
+                    {t("admin_categories_no_new_video")}
+                  </p>
+                )}
+              </div>
             </div>
           ) : null}
 
@@ -498,7 +607,7 @@ export default function AdminCategoriesPage() {
               disabled={createMutation.isPending || updateMutation.isPending}
             >
               <PencilLine className="h-4 w-4" />
-              {editingId ? "Save" : "Create"}
+              {editingId ? t("common_save") : t("common_create")}
             </button>
             {editingId ? (
               <button
@@ -513,7 +622,7 @@ export default function AdminCategoriesPage() {
                   setParentValidationMessage(null);
                 }}
               >
-                Cancel
+                {t("common_cancel")}
               </button>
             ) : null}
           </div>
@@ -521,7 +630,7 @@ export default function AdminCategoriesPage() {
       </motion.section>
 
       {categoriesQuery.isLoading ? (
-        <p className="text-sm text-muted">Loading categories...</p>
+        <p className="text-sm text-muted">{t("admin_categories_loading")}</p>
       ) : null}
 
       <section className="space-y-3">
@@ -536,7 +645,7 @@ export default function AdminCategoriesPage() {
             className="rounded-2xl border border-dashed border-slate-300/80 bg-card/60 p-8 text-center text-sm text-muted dark:border-slate-700"
           >
             <FolderTree className="mx-auto mb-2 h-5 w-5" />
-            No categories yet. Add your first category.
+            {t("admin_categories_no_categories")}
           </motion.div>
         ) : null}
       </section>
