@@ -157,6 +157,11 @@ export const translations: Record<Language, Record<string, string>> = {
     profile_inactive: "غير نشط",
     profile_roles: "الادوار",
     profile_created: "تاريخ الانشاء",
+    profile_delete_account: "حذف الحساب",
+    profile_deleting: "جاري حذف الحساب...",
+    profile_delete_confirm:
+      "هل انت متأكد من حذف حسابك؟ هذا الاجراء نهائي ولا يمكن التراجع عنه.",
+    profile_delete_failed: "فشل حذف الحساب. حاول مرة اخرى.",
     notifications_title: "الاشعارات",
     notifications_unread: "غير المقروء",
     notifications_mark_all_read: "تحديد الكل كمقروء",
@@ -562,6 +567,11 @@ export const translations: Record<Language, Record<string, string>> = {
     profile_inactive: "Inactive",
     profile_roles: "Roles",
     profile_created: "Created",
+    profile_delete_account: "Delete account",
+    profile_deleting: "Deleting account...",
+    profile_delete_confirm:
+      "Are you sure you want to delete your account? This action is permanent.",
+    profile_delete_failed: "Failed to delete account. Please try again.",
     notifications_title: "Notifications",
     notifications_unread: "Unread",
     notifications_mark_all_read: "Mark all as read",

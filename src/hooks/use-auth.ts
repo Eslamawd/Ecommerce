@@ -128,3 +128,19 @@ export function useLogout() {
     },
   });
 }
+
+export function useDeleteAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () =>
+      apiRequest<void>(ENDPOINTS.auth.deleteAccount, {
+        method: "DELETE",
+        auth: true,
+      }),
+    onSettled: () => {
+      clearAccessToken();
+      queryClient.clear();
+    },
+  });
+}

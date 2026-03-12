@@ -7,6 +7,7 @@ export const ENDPOINTS = {
     resendVerification: "/auth/email/verification-notification",
     logout: "/auth/logout",
     me: "/auth/me",
+    deleteAccount: "/auth/account",
   },
   categories: {
     list: "/categories",

@@ -6,12 +6,13 @@ import { useEffect } from "react";
 import { ThemeToggle } from "../../src/components/theme-toggle";
 import { useLanguage } from "../../src/components/language-provider";
 import { isAuthenticated } from "../../src/lib/auth";
-import { useLogout, useMe } from "../../src/hooks/use-auth";
+import { useDeleteAccount, useLogout, useMe } from "../../src/hooks/use-auth";
 
 export default function ProfilePage() {
   const router = useRouter();
   const meQuery = useMe();
   const logoutMutation = useLogout();
+  const deleteAccountMutation = useDeleteAccount();
   const { t } = useLanguage();
 
   useEffect(() => {
@@ -25,6 +26,21 @@ export default function ProfilePage() {
       await logoutMutation.mutateAsync();
     } finally {
       router.replace("/login");
+    }
+  };
+
+  const onDeleteAccount = async () => {
+    const confirmed = window.confirm(t("profile_delete_confirm"));
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteAccountMutation.mutateAsync();
+      router.replace("/register?deleted=1");
+    } catch {
+      // Error is displayed via mutation state.
     }
   };
 
@@ -47,6 +63,16 @@ export default function ProfilePage() {
                 ? t("profile_logging_out")
                 : t("profile_logout")}
             </button>
+            <button
+              type="button"
+              onClick={onDeleteAccount}
+              className="rounded-xl border border-rose-300 px-4 py-2 text-sm text-rose-700 transition hover:bg-rose-50 disabled:opacity-60 dark:border-rose-700 dark:text-rose-300 dark:hover:bg-rose-900/30"
+              disabled={deleteAccountMutation.isPending}
+            >
+              {deleteAccountMutation.isPending
+                ? t("profile_deleting")
+                : t("profile_delete_account")}
+            </button>
           </div>
         </div>
 
@@ -63,6 +89,13 @@ export default function ProfilePage() {
             >
               {t("profile_go_login")}
             </Link>
+          </div>
+        ) : null}
+
+        {deleteAccountMutation.isError ? (
+          <div className="mb-4 rounded-xl bg-rose-100 p-3 text-sm text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+            {(deleteAccountMutation.error as Error)?.message ??
+              t("profile_delete_failed")}
           </div>
         ) : null}
 
