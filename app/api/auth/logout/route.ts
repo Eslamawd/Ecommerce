@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
   const token = request.cookies.get("access_token")?.value;
 
   if (token) {
-    await fetch(resolveLaravelUrl("/logout"), {
+    await fetch(resolveLaravelUrl("/auth/logout"), {
       method: "POST",
       headers: {
         Accept: "application/json",
